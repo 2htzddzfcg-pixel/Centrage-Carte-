@@ -75,7 +75,7 @@ input[type=range]{width:100%}
   <div class="row"><button id="aut" class="b p">Redresser automatiquement</button><button id="gr" class="b">Grille</button></div>
   <h2>2. Régler les lignes</h2>
   <p id="am" class="st"></p>
-  <div class="lg"><span><i style="background:var(--i)"></i>Bord du cadre imprimé (le bord de la photo = le bord de la carte)</span></div>
+  <div class="lg"><span><i style="background:var(--o)"></i>Bord de la carte</span><span><i style="background:var(--i)"></i>Bord du cadre imprimé</span></div>
   <div class="nu"><button id="zm" class="b">−</button><span id="zl">Zoom ×1</span><button id="zp" class="b">+</button></div>
   <div class="nu"><button id="pv" class="b">‹</button><span id="lab"></span><button id="nx" class="b">›</button></div>
   <div class="nu"><button id="m" class="b">−</button><span>Déplacer la ligne (maintiens pour répéter)</span><button id="p" class="b">+</button></div>
@@ -131,7 +131,7 @@ $('#shot').onclick=()=>{
   const s=Math.max(W/vw,H/vh),ox=(vw*s-W)/2,oy=(vh*s-H)/2;
   const r=fr.getBoundingClientRect(),c=cam.getBoundingClientRect();
   let fx=r.left-c.left,fy=r.top-c.top,fw=r.width,fh=r.height;
-  const mx=fw*.06,my=fh*.06;fx-=mx;fy-=my;fw+=2*mx;fh+=2*my;
+  const mx=fw*.159,my=fh*.114;fx-=mx;fy-=my;fw+=2*mx;fh+=2*my;
   const sx=Math.max(0,(fx+ox)/s),sy=Math.max(0,(fy+oy)/s);
   const sw=Math.min(vw-sx,fw/s),sh=Math.min(vh-sy,fh/s);
   const k=document.createElement('canvas');k.width=Math.round(sw);k.height=Math.round(sh);
@@ -188,7 +188,7 @@ function rotated(){
   return t;
 }
 function outerBox(c){
-  const{d,w,h}=small(c,1200),p=prof(d,w,h,true,.3,.7),q=prof(d,w,h,false,.3,.7),tr=.0025;
+  const{d,w,h}=small(c,1200),p=prof(d,w,h,true,.3,.7),q=prof(d,w,h,false,.3,.7),tr=0;
   const a=edgePos(p),b=edgePos(p.slice().reverse()),t=edgePos(q),u=edgePos(q.slice().reverse());
   let x0=a==null?0:a/w+tr,x1=b==null?1:1-b/w-tr,y0=t==null?0:t/h+tr,y1=u==null?1:1-u/h-tr;
   if(x1-x0<.3||y1-y0<.3){x0=0;x1=1;y0=0;y1=1}
@@ -196,9 +196,15 @@ function outerBox(c){
 }
 function render(){
   const t=rotated(),b=outerBox(t),w=t.width,h=t.height;
-  const x0=Math.round(b[0]*w),y0=Math.round(b[2]*h);
-  cv.width=Math.round(b[1]*w)-x0;cv.height=Math.round(b[3]*h)-y0;
-  cv.getContext('2d').drawImage(t,x0,y0,cv.width,cv.height,0,0,cv.width,cv.height);
+  const X0=b[0]*w,X1=b[1]*w,Y0=b[2]*h,Y1=b[3]*h;
+  const full=b[0]===0&&b[1]===1&&b[2]===0&&b[3]===1;
+  const mx=full?0:(X1-X0)*10/63,my=full?0:(Y1-Y0)*10/88;
+  const cw=Math.round(X1-X0+2*mx),ch=Math.round(Y1-Y0+2*my);
+  cv.width=cw;cv.height=ch;
+  const c=cv.getContext('2d');c.fillStyle=S.bg;c.fillRect(0,0,cw,ch);
+  const sx=X0-mx,sy=Y0-my,ix=Math.max(0,sx),iy=Math.max(0,sy),ex=Math.min(w,sx+cw),ey=Math.min(h,sy+ch);
+  c.drawImage(t,ix,iy,ex-ix,ey-iy,ix-sx,iy-sy,ex-ix,ey-iy);
+  S.o={l:mx/cw,r:(mx+X1-X0)/cw,t:my/ch,b:(my+Y1-Y0)/ch};
 }
 function rotApply(v){
   S.rot=Math.max(-10,Math.min(10,Math.round(v*20)/20));
@@ -259,15 +265,17 @@ function scanIn(a){
   return null;
 }
 function detect(quiet){
-  const{d,w,h}=small(cv),c=prof(d,w,h,true,.3,.7),r=prof(d,w,h,false,.3,.7);
-  const v=[scanIn(c),scanIn(c.slice().reverse()),scanIn(r),scanIn(r.slice().reverse())];
+  const{d,w,h}=small(cv),o=S.o,c=prof(d,w,h,true,.3,.7),r=prof(d,w,h,false,.3,.7);
+  const cc=c.slice(Math.round(o.l*w),Math.round(o.r*w)),rr=r.slice(Math.round(o.t*h),Math.round(o.b*h));
+  const cwd=o.r-o.l,chd=o.b-o.t;
+  const v=[scanIn(cc),scanIn(cc.slice().reverse()),scanIn(rr),scanIn(rr.slice().reverse())];
+  Object.assign(L,{oL:o.l,oR:o.r,oT:o.t,oB:o.b,iL:o.l+.07*cwd,iR:o.r-.07*cwd,iT:o.t+.05*chd,iB:o.b-.05*chd});
   let ok=0;
-  Object.assign(L,{oL:0,oR:1,oT:0,oB:1});
-  if(v[0]!=null){L.iL=v[0];ok++}
-  if(v[1]!=null){L.iR=1-v[1];ok++}
-  if(v[2]!=null){L.iT=v[2];ok++}
-  if(v[3]!=null){L.iB=1-v[3];ok++}
-  $('#am').textContent=ok===4?'Cadre détecté automatiquement. Vérifie et corrige si besoin.':ok?'Détection partielle ('+ok+'/4 côtés). Corrige les autres lignes à la main.':'Détection impossible sur cette photo. Place les lignes à la main.';
+  if(v[0]!=null){L.iL=o.l+v[0]*cwd;ok++}
+  if(v[1]!=null){L.iR=o.r-v[1]*cwd;ok++}
+  if(v[2]!=null){L.iT=o.t+v[2]*chd;ok++}
+  if(v[3]!=null){L.iB=o.b-v[3]*chd;ok++}
+  $('#am').textContent=ok===4?'Carte et cadre détectés automatiquement. Vérifie et corrige si besoin.':ok?'Détection partielle ('+ok+'/4 côtés). Corrige les autres lignes à la main.':'Détection impossible sur cette photo. Place les lignes à la main.';
   if(!quiet)draw();
 }
 function edgePos(p){
@@ -316,7 +324,6 @@ $('#det').onclick=()=>detect(false);
 function build(){
   box.querySelectorAll('.ln').forEach(n=>n.remove());
   for(const k in L){
-    if(k[0]==='o')continue;
     const d=document.createElement('div');d.dataset.k=k;
     d.className='ln '+(k[0]==='o'?'o ':'i ')+(k[1]==='L'||k[1]==='R'?'v':'h');
     box.appendChild(d);
@@ -370,7 +377,7 @@ function centerSel(){const v=$('#vp');requestAnimationFrame(()=>{const w=box.off
 function setZ(n){z=n;box.style.width=n*100+'%';zlab();centerSel()}
 $('#zp').onclick=()=>setZ(Z.find(v=>v>z+.01)||Z[Z.length-1]);
 $('#zm').onclick=()=>setZ(Z.slice().reverse().find(v=>v<z-.01)||1);
-function pick(d){const o=['iL','iR','iT','iB'];sel=o[(o.indexOf(sel)+d+o.length)%o.length];draw();centerSel()}
+function pick(d){const o=X.concat(Y);sel=o[(o.indexOf(sel)+d+o.length)%o.length];draw();centerSel()}
 $('#pv').onclick=()=>pick(-1);
 $('#nx').onclick=()=>pick(1);
 function hold(id,sg){
