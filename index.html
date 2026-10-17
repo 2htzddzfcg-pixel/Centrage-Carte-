@@ -114,7 +114,7 @@ const nf2=v=>v.toFixed(2).replace('.',',');
 const X=['oL','iL','iR','oR'],Y=['oT','iT','iB','oB'];
 const NAMES={oL:'bord gauche de la carte',iL:'bord gauche du cadre',iR:'bord droit du cadre',oR:'bord droit de la carte',oT:'bord haut de la carte',iT:'bord haut du cadre',iB:'bord bas du cadre',oB:'bord bas de la carte'};
 const T={
-  PSA:[['10',55,75],['9',60,90],['8',65,90],['7',70,90],['6',80,90],['5',85,90],['4',85,90],['3',90,90],['2',90,90],['1,5',90,90]]
+  PSA:[['10',55,55],['9',60,90],['8',65,90],['7',70,90],['6',80,90],['5',85,90],['4',85,90],['3',90,90],['2',90,90],['1,5',90,90]]
 };
 const NONE={PSA:'au-delà de 90/10'};
 const D={front:null,back:null};
@@ -465,14 +465,12 @@ function results(){
     const t=T[n],lb=v=>v==null?NONE[n]:v;
     h+='<div class="g"><span>'+n+'</span><b>'+lb(pickG(t,f,b))+'</b><small>'+(f?'Avant '+lb(pickG(t,f,null)):'')+(f&&b?' · ':'')+(b?'Arrière '+lb(pickG(t,null,b)):'')+'</small></div>';
   }
-  $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit. Couleurs : à l’avant, vert si le centrage est conforme à un PSA 10 (55/45 au plus), rouge sinon ; à l’arrière, du vert à 55/45 jusqu’au rouge à 75/25.</p>';
+  $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit. Couleurs : vert si le centrage est conforme à un PSA 10 (55/45 au plus), rouge sinon, à l’avant comme à l’arrière. Règle choisie ici : un PSA 10 exige 55/45 sur les deux faces (PSA tolère officiellement jusqu’à 75/25 au dos).</p>';
 }
 function rt(v){return nf(v>50?v:100-v)+' / '+nf(v>50?100-v:v)}
 function colr(k,v){
   const x=v>50?v:100-v;
-  if(k==='front')return Math.round(x)<=55?'#17c964':'#f0443a';
-  const t=Math.max(0,Math.min(1,(x-55)/20));
-  return 'hsl('+Math.round(130*(1-t))+',82%,48%)';
+  return Math.round(x)<=55?'#17c964':'#f0443a';
 }
 function rtc(v,k){return '<span style="color:'+colr(k,v)+';font-weight:700">'+rt(v)+'</span>'}
 function thumb(){
