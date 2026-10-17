@@ -28,7 +28,10 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .b:disabled{opacity:.4;cursor:default}
 .vp{overflow:auto;max-height:70vh;border-radius:8px;background:#000}
 .box{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:8px;overflow:hidden;background:#000}
-.box.grid::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,255,255,.4) 1px,transparent 1px) 0 0/10% 100%,linear-gradient(to bottom,rgba(255,255,255,.4) 1px,transparent 1px) 0 0/100% 10%}
+.gl{position:absolute;pointer-events:none;background:rgba(255,255,255,.4)}
+.gl.h{left:0;right:0;height:1px}
+.gl.v{top:0;bottom:0;width:1px}
+.gl.b{background:#ff5a5a;height:2px}
 canvas{width:100%;height:auto;display:block}
 .ln{position:absolute;touch-action:none}
 .ln::before{content:"";position:absolute;background:currentColor}
@@ -156,7 +159,7 @@ function addSide(c){
   const p=c.getContext('2d').getImageData(2,2,1,1).data;
   D[side]=S={raw:c,rot:0,bg:'rgb('+p[0]+','+p[1]+','+p[2]+')',L:{oL:0,iL:.07,iR:.93,oR:1,oT:0,iT:.05,iB:.95,oB:1}};
   L=S.L;stopCam();
-  const a=autoAngle();S.rot=a==null?0:Math.round(a*20)/20;
+  let a=autoAngle(true);if(a==null)a=autoAngle(false);S.rot=a==null?0:Math.round(a*20)/20;
   render();detect(true);setSide(side);
 }
 function setSide(s){
@@ -165,7 +168,7 @@ function setSide(s){
   $('#tf').textContent='Face avant'+(D.front?' ✓':'');$('#tb').textContent='Face arrière'+(D.back?' ✓':'');
   if(S){
     stopCam();$('#s1').hidden=true;$('#s2').hidden=false;
-    L=S.L;sel='iL';render();
+    L=S.L;sel='iL';render();box.classList.add('grid');
     $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
     build();setZ(1);
   }else{
@@ -209,16 +212,26 @@ function render(){
 function rotApply(v){
   S.rot=Math.max(-10,Math.min(10,Math.round(v*20)/20));
   $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
-  render();detect(true);draw();
+  render();detect(true);draw();drawGrid();
 }
 $('#rot').oninput=e=>rotApply(+e.target.value);
 $('#r1').onclick=()=>rotApply(S.rot-.05);
 $('#r2').onclick=()=>rotApply(S.rot+.05);
-$('#gr').onclick=()=>box.classList.toggle('grid');
-function autoAngle(){
+function drawGrid(){
+  box.querySelectorAll('.gl').forEach(n=>n.remove());
+  if(!S||!box.classList.contains('grid'))return;
+  const o=S.o,sy=.1,sx=.1*cv.height/cv.width;
+  for(let k=-12;k<=12;k++){
+    const y=o.b+k*sy,x=o.l+k*sx;
+    if(y>0&&y<1){const d=document.createElement('div');d.className='gl h'+(k===0?' b':'');d.style.top=y*100+'%';box.appendChild(d)}
+    if(x>0&&x<1){const d=document.createElement('div');d.className='gl v';d.style.left=x*100+'%';box.appendChild(d)}
+  }
+}
+$('#gr').onclick=()=>{box.classList.toggle('grid');drawGrid()};
+function autoAngle(bo){
   const prev=S.rot;let r=0,ok=false;
   for(let i=0;i<4;i++){
-    S.rot=r;const a=angleOf(rotated());
+    S.rot=r;const a=angleOf(rotated(),bo);
     if(a==null)break;
     ok=true;r=Math.max(-10,Math.min(10,r+a));
     if(Math.abs(a)<.03)break;
@@ -304,9 +317,10 @@ function fitLine(pts){
   }
   return b;
 }
-function angleOf(c){
+function angleOf(c,bo){
   const{d,w,h}=small(c,1200),A=[];
   for(const vert of[1,0])for(const rv of[0,1]){
+    if(bo&&(vert||!rv))continue;
     const pts=[],len=vert?h:w;
     for(let k=0;k<14;k++){
       const t=.12+.76*k/13;let p=prof(d,w,h,vert,t-.02,t+.02);if(rv)p.reverse();
@@ -314,7 +328,7 @@ function angleOf(c){
     }
     const b=fitLine(pts);if(b!=null)A.push((vert?1:-1)*Math.atan(b));
   }
-  if(A.length<2)return null;
+  if(A.length<(bo?1:2))return null;
   A.sort((x,y)=>x-y);const md=A[A.length>>1],B=A.filter(v=>Math.abs(v-md)<.009);
   return B.reduce((s,v)=>s+v,0)/B.length*180/Math.PI;
 }
@@ -328,7 +342,7 @@ function build(){
     d.className='ln '+(k[0]==='o'?'o ':'i ')+(k[1]==='L'||k[1]==='R'?'v':'h');
     box.appendChild(d);
   }
-  draw();
+  draw();drawGrid();
 }
 function move(k,v){
   const a=X.includes(k)?X:Y,i=a.indexOf(k);
