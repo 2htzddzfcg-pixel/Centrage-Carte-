@@ -74,11 +74,13 @@ input[type=range]{width:100%}
 
 <section id="s2" hidden>
   <h2>1. Redresser la photo</h2>
-  <p class="st">Fais pivoter la photo avec − et + jusqu’à ce que le bas de la carte soit parallèle à la ligne rouge.</p>
+  <p class="st">Fais pivoter la photo avec − et + jusqu’à ce que le bas de la carte soit parallèle à la ligne rouge, puis monte ou descends la photo pour que le bas de la carte touche la ligne.</p>
   <div class="vp" id="vp"><div class="box" id="box"><canvas id="cv"></canvas></div></div>
   <div class="nu"><button id="r1" class="b">−</button><span id="rl">Rotation 0,0°</span><button id="r2" class="b">+</button></div>
   <input type="range" id="rot" min="-10" max="10" step="0.01" value="0">
-  <div class="row"><button id="aut" class="b p">Redresser automatiquement</button><button id="gr" class="b">Grille</button></div>
+  <div class="nu"><button id="v1" class="b">▲</button><span id="vl">Position verticale 0,00 %</span><button id="v2" class="b">▼</button></div>
+  <input type="range" id="dy" min="-10" max="10" step="0.01" value="0">
+  <div class="row"><button id="gr" class="b">Grille</button></div>
   <h2>2. Régler les lignes</h2>
   <p id="am" class="st"></p>
   <div class="lg"><span><i style="background:var(--o)"></i>Bord de la carte</span><span><i style="background:var(--i)"></i>Bord du cadre imprimé</span></div>
@@ -163,7 +165,7 @@ $('#file').onchange=e=>{
 /* faces */
 function addSide(c){
   const p=c.getContext('2d').getImageData(2,2,1,1).data;
-  D[side]=S={raw:c,rot:0,bg:'rgb('+p[0]+','+p[1]+','+p[2]+')',L:{oL:0,iL:.07,iR:.93,oR:1,oT:0,iT:.05,iB:.95,oB:1}};
+  D[side]=S={raw:c,rot:0,dy:0,bg:'#101010',L:{oL:0,iL:.07,iR:.93,oR:1,oT:0,iT:.05,iB:.95,oB:1}};
   L=S.L;stopCam();
   let a=autoAngle(true);if(a==null)a=autoAngle(false);S.rot=a==null?0:Math.round(a*20)/20;
   render();detect(true);setSide(side);
@@ -180,6 +182,7 @@ function setSide(s){
     stopCam();$('#s1').hidden=true;$('#s2').hidden=false;
     L=S.L;sel='iL';render();box.classList.add('grid');
     $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
+    $('#dy').value=(S.dy||0)*100;$('#vl').textContent='Position verticale '+nf2((S.dy||0)*100)+' %';
     $('#next').textContent=s==='front'?'Suivant : face arrière':'Suivant : récapitulatif';
     build();setZ(1);
   }else{
@@ -220,7 +223,7 @@ function render(){
   cv.width=cw;cv.height=ch;
   const c=cv.getContext('2d');c.fillStyle=S.bg;c.fillRect(0,0,cw,ch);
   const sx=X0-mx,sy=Y0-my,ix=Math.max(0,sx),iy=Math.max(0,sy),ex=Math.min(w,sx+cw),ey=Math.min(h,sy+ch);
-  c.drawImage(t,ix,iy,ex-ix,ey-iy,ix-sx,iy-sy,ex-ix,ey-iy);
+  c.drawImage(t,ix,iy,ex-ix,ey-iy,ix-sx,iy-sy+Math.round((S.dy||0)*ch),ex-ix,ey-iy);
   S.o={l:mx/cw,r:(mx+X1-X0)/cw,t:my/ch,b:(my+Y1-Y0)/ch};
 }
 function rotApply(v){
@@ -237,6 +240,21 @@ function holdRot(id,sg){
   b.oncontextmenu=e=>e.preventDefault();
 }
 holdRot('#r1',-1);holdRot('#r2',1);
+function vApply(v){
+  S.dy=Math.max(-.1,Math.min(.1,Math.round(v*10000)/10000));
+  $('#dy').value=S.dy*100;$('#vl').textContent='Position verticale '+nf2(S.dy*100)+' %';
+  render();detect(true);draw();drawGrid();
+}
+$('#dy').oninput=e=>vApply(+e.target.value/100);
+function holdV(id,sg){
+  const b=$(id);let t,n=0;
+  const go=()=>{n++;vApply((S.dy||0)+sg*.0005*Math.min(8,1+n/6))};
+  b.onpointerdown=e=>{e.preventDefault();clearTimeout(t);n=0;go();t=setTimeout(function f(){go();t=setTimeout(f,50)},350)};
+  b.onpointerup=b.onpointerleave=b.onpointercancel=()=>clearTimeout(t);
+  b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};
+  b.oncontextmenu=e=>e.preventDefault();
+}
+holdV('#v1',-1);holdV('#v2',1);
 function drawGrid(){
   box.querySelectorAll('.gl').forEach(n=>n.remove());
   if(!S||!box.classList.contains('grid'))return;
@@ -258,11 +276,6 @@ function autoAngle(bo){
   }
   S.rot=prev;return ok?r:null;
 }
-$('#aut').onclick=()=>{
-  const a=autoAngle();
-  if(a==null){$('#am').textContent='Angle introuvable : redresse avec le curseur.';return}
-  rotApply(a);
-};
 
 /* détection */
 function small(c,m){
