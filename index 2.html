@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Centrage de carte</title>
+<style>
+:root{--bg:#f1f4f2;--pn:#fff;--tx:#15211c;--mu:#5d6b64;--o:#c98300;--i:#0a8fb8;--bd:#d5dcd8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1714;--pn:#17231f;--tx:#e9f1ed;--mu:#9aaba3;--o:#ffc233;--i:#45c6ee;--bd:#2a3a34;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1714;--pn:#17231f;--tx:#e9f1ed;--mu:#9aaba3;--o:#ffc233;--i:#45c6ee;--bd:#2a3a34;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;line-height:1.45}
+[hidden]{display:none!important}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:0 0 12px}
+h2{font-size:1rem;margin:16px 0 6px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tabs .b.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.cam{position:relative;width:100%;aspect-ratio:3/4;background:#000;overflow:hidden;border-radius:14px}
+video{width:100%;height:100%;object-fit:cover;display:block}
+.fr{position:absolute;left:16%;width:68%;top:50%;transform:translateY(-50%);aspect-ratio:63/88;border:3px solid #fff;border-radius:8px;box-shadow:0 0 0 999px rgba(0,0,0,.5);transition:border-color .2s}
+.fr.ok{border-color:#3ddc84;box-shadow:0 0 0 999px rgba(0,0,0,.5),0 0 18px #3ddc84}
+.st{margin:10px 0;color:var(--mu)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.b{font:inherit;padding:10px 16px;border-radius:10px;border:1px solid var(--bd);background:var(--pn);color:var(--tx);min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.b.p{background:var(--tx);color:var(--bg);border-color:var(--tx)}
+.b:disabled{opacity:.4;cursor:default}
+.vp{overflow:auto;max-height:70vh;border-radius:8px;background:#000}
+.box{position:relative;touch-action:pan-x pan-y;user-select:none;-webkit-user-select:none;border-radius:8px;overflow:hidden;background:#000}
+.box.grid::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,rgba(255,255,255,.4) 1px,transparent 1px) 0 0/10% 100%,linear-gradient(to bottom,rgba(255,255,255,.4) 1px,transparent 1px) 0 0/100% 10%}
+canvas{width:100%;height:auto;display:block}
+.ln{position:absolute;touch-action:none}
+.ln::before{content:"";position:absolute;background:currentColor}
+.ln.o{color:var(--o)}.ln.i{color:var(--i)}
+.ln.v{top:0;bottom:0;width:26px;margin-left:-13px;cursor:ew-resize}
+.ln.v::before{left:12.5px;width:1px;top:0;bottom:0}
+.ln.h{left:0;right:0;height:26px;margin-top:-13px;cursor:ns-resize}
+.ln.h::before{top:12.5px;height:1px;left:0;right:0}
+.lg{display:flex;gap:14px;font-size:.9rem;color:var(--mu);margin:8px 0}
+.lg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+.nu{display:flex;align-items:center;gap:8px;margin:8px 0}
+.nu span{flex:1;font-size:.9rem;color:var(--mu);text-align:center}
+input[type=range]{width:100%}
+.rw{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 8px}
+.rw>div,.g{background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:10px 12px}
+.rw b,.g span{display:block;font-size:.85rem;color:var(--mu);font-weight:500}
+.n{display:block;font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums}
+.gr{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.g b{font-size:1.25rem}
+.g small{display:block;color:var(--mu);font-size:.8rem}
+.nt{font-size:.85rem;color:var(--mu)}
+</style>
+</head>
+<body>
+<main>
+<h1>Centrage de carte</h1>
+<div class="tabs"><button id="tf" class="b on">Face avant</button><button id="tb" class="b">Face arrière</button></div>
+
+<section id="s1">
+  <div class="cam" id="cam"><video id="vid" playsinline muted></video><div id="fr" class="fr"></div></div>
+  <p id="st" class="st"></p>
+  <div class="row">
+    <button id="go" class="b p">Ouvrir la caméra</button>
+    <button id="shot" class="b p" hidden>Prendre la photo</button>
+    <label class="b">Importer une photo<input type="file" id="file" accept="image/*" hidden></label>
+  </div>
+</section>
+
+<section id="s2" hidden>
+  <h2>1. Redresser la photo</h2>
+  <div class="vp" id="vp"><div class="box" id="box"><canvas id="cv"></canvas></div></div>
+  <div class="nu"><button id="r1" class="b">−</button><span id="rl">Rotation 0,0°</span><button id="r2" class="b">+</button></div>
+  <input type="range" id="rot" min="-10" max="10" step="0.05" value="0">
+  <div class="row"><button id="aut" class="b p">Redresser automatiquement</button><button id="gr" class="b">Grille</button></div>
+  <h2>2. Régler les lignes</h2>
+  <p id="am" class="st"></p>
+  <div class="lg"><span><i style="background:var(--o)"></i>Bord de la carte</span><span><i style="background:var(--i)"></i>Bord du cadre imprimé</span></div>
+  <div class="nu"><button id="zm" class="b">−</button><span id="zl">Zoom ×1</span><button id="zp" class="b">+</button></div>
+  <div class="nu"><button id="pv" class="b">‹</button><span id="lab"></span><button id="nx" class="b">›</button></div>
+  <div class="nu"><button id="m" class="b">−</button><span>Déplacer la ligne (maintiens pour répéter)</span><button id="p" class="b">+</button></div>
+  <div class="row"><button id="det" class="b">Détecter les bords</button><button id="again" class="b">Reprendre cette face</button></div>
+</section>
+<div id="res"></div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s),vid=$('#vid'),cam=$('#cam'),fr=$('#fr'),cv=$('#cv'),box=$('#box');
+const nf=v=>v.toFixed(1).replace('.',',');
+const nf2=v=>v.toFixed(2).replace('.',',');
+const X=['oL','iL','iR','oR'],Y=['oT','iT','iB','oB'];
+const NAMES={oL:'bord gauche de la carte',iL:'bord gauche du cadre',iR:'bord droit du cadre',oR:'bord droit de la carte',oT:'bord haut de la carte',iT:'bord haut du cadre',iB:'bord bas du cadre',oB:'bord bas de la carte'};
+const T={
+  PSA:[['10',55,75],['9',60,90],['8',65,90],['7',70,90],['6',80,90],['5',85,90],['4',85,90],['3',90,90],['2',90,90],['1,5',90,90]],
+  Beckett:[['10 Pristine',50,60],['9,5',55,60,50],['9',55,70],['8',60,80],['7',65,90],['6',70,95],['5',75,95],['4',80,100],['3',85,100],['2',90,100]],
+  CGC:[['10 Pristine',50,null],['10 Gem Mint',55,75]]
+};
+const NONE={PSA:'au-delà de 90/10',Beckett:'au-delà de 90/10',CGC:'sous le 10 (aucun seuil publié)'};
+const D={front:null,back:null};
+let side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
+const Z=[1,2,3,4,6],NAME={front:'Face avant',back:'Face arrière'};
+
+/* caméra et inclinaison */
+function upd(){
+  fr.classList.toggle('ok',flat);
+  $('#shot').disabled=sens&&!flat;
+  $('#st').textContent=NAME[side]+' : '+(!sens?'capteur d’inclinaison indisponible, aligne la carte dans le cadre.':flat?'téléphone à plat ('+nf(tilt)+'°), tu peux prendre la photo.':'inclinaison de '+nf(tilt)+'°, mets le téléphone bien à plat.');
+}
+function onOri(e){
+  if(e.beta==null||e.gamma==null)return;
+  sens=true;tilt=Math.max(Math.abs(e.beta),Math.abs(e.gamma));flat=tilt<3;
+  if(stream)upd();
+}
+async function startCam(){
+  if(!wantCam){
+    try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission)await DeviceOrientationEvent.requestPermission()}catch(e){}
+    addEventListener('deviceorientation',onOri);
+  }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1920}},audio:false});
+    vid.srcObject=stream;await vid.play();wantCam=true;
+    $('#go').hidden=true;$('#shot').hidden=false;setTimeout(upd,800);
+  }catch(e){
+    $('#st').textContent='Caméra inaccessible. Autorise-la dans Safari, ou importe une photo.';
+  }
+}
+function stopCam(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+$('#go').onclick=startCam;
+$('#shot').onclick=()=>{
+  const W=cam.clientWidth,H=cam.clientHeight,vw=vid.videoWidth,vh=vid.videoHeight;
+  const s=Math.max(W/vw,H/vh),ox=(vw*s-W)/2,oy=(vh*s-H)/2;
+  const r=fr.getBoundingClientRect(),c=cam.getBoundingClientRect();
+  let fx=r.left-c.left,fy=r.top-c.top,fw=r.width,fh=r.height;
+  const mx=fw*.06,my=fh*.06;fx-=mx;fy-=my;fw+=2*mx;fh+=2*my;
+  const sx=Math.max(0,(fx+ox)/s),sy=Math.max(0,(fy+oy)/s);
+  const sw=Math.min(vw-sx,fw/s),sh=Math.min(vh-sy,fh/s);
+  const k=document.createElement('canvas');k.width=Math.round(sw);k.height=Math.round(sh);
+  k.getContext('2d').drawImage(vid,sx,sy,sw,sh,0,0,k.width,k.height);
+  addSide(k,{oL:.054,iL:.14,iR:.86,oR:.946,oT:.054,iT:.11,iB:.89,oB:.946});
+};
+$('#file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const im=new Image();
+  im.onload=()=>{
+    const s=Math.min(1,2000/Math.max(im.width,im.height));
+    const k=document.createElement('canvas');k.width=Math.round(im.width*s);k.height=Math.round(im.height*s);
+    k.getContext('2d').drawImage(im,0,0,k.width,k.height);
+    URL.revokeObjectURL(im.src);
+    addSide(k,{oL:.05,iL:.14,iR:.86,oR:.95,oT:.05,iT:.11,iB:.89,oB:.95});
+  };
+  im.src=URL.createObjectURL(f);e.target.value='';
+};
+
+/* faces */
+function addSide(c,l){
+  const p=c.getContext('2d').getImageData(2,2,1,1).data;
+  D[side]=S={src:c,rot:0,bg:'rgb('+p[0]+','+p[1]+','+p[2]+')',L:l};L=l;
+  stopCam();render();detect(true);setSide(side);
+}
+function setSide(s){
+  side=s;S=D[s];
+  $('#tf').classList.toggle('on',s==='front');$('#tb').classList.toggle('on',s==='back');
+  $('#tf').textContent='Face avant'+(D.front?' ✓':'');$('#tb').textContent='Face arrière'+(D.back?' ✓':'');
+  if(S){
+    stopCam();$('#s1').hidden=true;$('#s2').hidden=false;
+    L=S.L;sel='oL';render();
+    $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
+    build();setZ(1);
+  }else{
+    $('#s2').hidden=true;$('#s1').hidden=false;fr.classList.remove('ok');
+    $('#go').hidden=wantCam;$('#shot').hidden=!wantCam;
+    $('#st').textContent=NAME[s]+' : pose la carte à plat, le téléphone à plat au-dessus, puis ouvre la caméra.';
+    if(wantCam&&!stream)startCam();
+  }
+  results();
+}
+$('#tf').onclick=()=>setSide('front');
+$('#tb').onclick=()=>setSide('back');
+$('#again').onclick=()=>{D[side]=null;setSide(side)};
+
+/* rotation */
+function render(){
+  const s=S.src,w=s.width,h=s.height;cv.width=w;cv.height=h;
+  const c=cv.getContext('2d');c.fillStyle=S.bg;c.fillRect(0,0,w,h);
+  c.save();c.translate(w/2,h/2);c.rotate(S.rot*Math.PI/180);c.drawImage(s,-w/2,-h/2);c.restore();
+}
+function rotApply(v){
+  S.rot=Math.max(-10,Math.min(10,Math.round(v*20)/20));
+  $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
+  render();detect(true);draw();
+}
+$('#rot').oninput=e=>rotApply(+e.target.value);
+$('#r1').onclick=()=>rotApply(S.rot-.05);
+$('#r2').onclick=()=>rotApply(S.rot+.05);
+$('#gr').onclick=()=>box.classList.toggle('grid');
+$('#aut').onclick=()=>{
+  const prev=S.rot;let r=0,ok=false;
+  for(let i=0;i<4;i++){
+    S.rot=r;render();const a=angleOf(cv);
+    if(a==null)break;
+    ok=true;r=Math.max(-10,Math.min(10,r+a));
+    if(Math.abs(a)<.03)break;
+  }
+  if(!ok){S.rot=prev;render();$('#am').textContent='Angle introuvable : redresse avec le curseur.';return}
+  rotApply(r);
+};
+
+/* détection */
+function small(c,m){
+  const s=Math.min(1,(m||600)/c.width),w=Math.round(c.width*s),h=Math.round(c.height*s);
+  const t=document.createElement('canvas');t.width=w;t.height=h;
+  const x=t.getContext('2d');x.drawImage(c,0,0,w,h);
+  return{d:x.getImageData(0,0,w,h).data,w,h};
+}
+function prof(d,w,h,vert,a,b){
+  const out=[],n=vert?w:h,m=vert?h:w;
+  for(let i=0;i<n;i++){
+    const v=[0,0,0];let c=0;
+    for(let j=Math.round(m*a);j<Math.round(m*b);j++){const q=vert?(j*w+i)*4:(i*w+j)*4;v[0]+=d[q];v[1]+=d[q+1];v[2]+=d[q+2];c++}
+    out.push([v[0]/c,v[1]/c,v[2]/c]);
+  }
+  return out;
+}
+function avg(a,s,e){const r=[0,0,0];let c=0;for(let i=s;i<e&&i<a.length;i++){r[0]+=a[i][0];r[1]+=a[i][1];r[2]+=a[i][2];c++}c=c||1;return[r[0]/c,r[1]/c,r[2]/c]}
+const cd=(p,q)=>Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1])+Math.abs(p[2]-q[2]);
+function scan(a){
+  const n=a.length,k=Math.max(2,Math.round(n*.01)),bg=avg(a,0,k);
+  let o=-1;
+  for(let i=k;i<n*.3;i++)if(cd(a[i],bg)>90&&cd(a[i+1],bg)>90&&cd(a[i+2],bg)>90){o=i;break}
+  if(o<0)return null;
+  const be=o+Math.round(n*.025),bc=avg(a,o+Math.round(n*.012),be);
+  let t=-1;
+  for(let i=be;i<n*.45;i++)if(cd(a[i],bc)>110&&cd(a[i+1],bc)>110){t=i;break}
+  return[o/n,t<0?null:t/n];
+}
+function detect(quiet){
+  const{d,w,h}=small(cv),c=prof(d,w,h,true,.3,.7),r=prof(d,w,h,false,.3,.7);
+  let ok=0;
+  const set=(k1,k2,v,inv)=>{if(!v)return;L[k1]=inv?1-v[0]:v[0];if(v[1]!=null){L[k2]=inv?1-v[1]:v[1];ok++}};
+  set('oL','iL',scan(c));set('oR','iR',scan(c.slice().reverse()),1);
+  set('oT','iT',scan(r));set('oB','iB',scan(r.slice().reverse()),1);
+  $('#am').textContent=ok===4?'Bords détectés automatiquement. Vérifie et corrige si besoin.':ok?'Détection partielle ('+ok+'/4 côtés). Corrige les autres lignes à la main.':'Détection impossible sur cette photo. Place les lignes à la main.';
+  if(!quiet)draw();
+}
+function edgePos(p){
+  const n=p.length,Lm=p.map(v=>.299*v[0]+.587*v[1]+.114*v[2]);
+  const sm=Lm.map((v,i)=>(Lm[Math.max(0,i-1)]+v+Lm[Math.min(n-1,i+1)])/3);
+  const g=sm.map((v,i)=>i>=2&&i<n-2?Math.abs(sm[i+2]-sm[i-2]):0);
+  const k=Math.max(2,Math.round(n*.01)),e=Math.floor(n*.3);
+  let m=0;for(let i=k;i<e;i++)if(g[i]>m)m=g[i];
+  if(m<30)return null;
+  for(let i=k;i<e;i++)if(g[i]>=.6*m&&g[i]>=g[i-1]&&g[i]>=g[i+1]){
+    const d=g[i-1]-2*g[i]+g[i+1];
+    return i+(d?.5*(g[i-1]-g[i+1])/d:0);
+  }
+  return null;
+}
+function fitLine(pts){
+  if(pts.length<5)return null;
+  let P=pts,b=0;
+  for(let it=0;it<3;it++){
+    const n=P.length,mx=P.reduce((s,q)=>s+q[0],0)/n,my=P.reduce((s,q)=>s+q[1],0)/n;
+    let sxx=0,sxy=0;for(const q of P){sxx+=(q[0]-mx)**2;sxy+=(q[0]-mx)*(q[1]-my)}
+    b=sxy/sxx;const a=my-b*mx;
+    const r=P.map(q=>Math.abs(q[1]-a-b*q[0])),md=r.slice().sort((x,y)=>x-y)[n>>1];
+    const Q=P.filter((q,i)=>r[i]<=2*md+.5);
+    if(Q.length<5)break;P=Q;
+  }
+  return b;
+}
+function angleOf(c){
+  const{d,w,h}=small(c,1200),A=[];
+  for(const vert of[1,0])for(const rv of[0,1]){
+    const pts=[],len=vert?h:w;
+    for(let k=0;k<14;k++){
+      const t=.12+.76*k/13;let p=prof(d,w,h,vert,t-.02,t+.02);if(rv)p.reverse();
+      const x=edgePos(p);if(x!=null)pts.push([t*len,rv?p.length-x:x]);
+    }
+    const b=fitLine(pts);if(b!=null)A.push((vert?1:-1)*Math.atan(b));
+  }
+  if(A.length<2)return null;
+  A.sort((x,y)=>x-y);const md=A[A.length>>1],B=A.filter(v=>Math.abs(v-md)<.009);
+  return B.reduce((s,v)=>s+v,0)/B.length*180/Math.PI;
+}
+$('#det').onclick=()=>detect(false);
+
+/* lignes */
+function build(){
+  box.querySelectorAll('.ln').forEach(n=>n.remove());
+  for(const k in L){
+    const d=document.createElement('div');d.dataset.k=k;
+    d.className='ln '+(k[0]==='o'?'o ':'i ')+(k[1]==='L'||k[1]==='R'?'v':'h');
+    box.appendChild(d);
+  }
+  draw();
+}
+function move(k,v){
+  const a=X.includes(k)?X:Y,i=a.indexOf(k);
+  const lo=i?L[a[i-1]]+.01:0,hi=i<3?L[a[i+1]]-.01:1;
+  L[k]=Math.min(hi,Math.max(lo,v));
+}
+function draw(){
+  box.querySelectorAll('.ln').forEach(d=>{
+    const k=d.dataset.k,p=L[k]*100+'%';
+    if(d.classList.contains('v'))d.style.left=p;else d.style.top=p;
+  });
+  $('#lab').textContent='Ligne choisie : '+NAMES[sel];
+  results();
+}
+box.onpointerdown=e=>{
+  const k=e.target.dataset&&e.target.dataset.k;if(!k)return;
+  sel=k;drag=k;box.setPointerCapture(e.pointerId);e.preventDefault();draw();
+};
+box.onpointermove=e=>{
+  if(!drag)return;
+  const r=box.getBoundingClientRect();
+  move(drag,X.includes(drag)?(e.clientX-r.left)/r.width:(e.clientY-r.top)/r.height);draw();
+};
+box.onpointerup=box.onpointercancel=()=>{drag=null};
+function centerSel(){const v=$('#vp');requestAnimationFrame(()=>{const w=box.offsetWidth,h=box.offsetHeight;if(X.includes(sel)){v.scrollLeft=L[sel]*w-v.clientWidth/2;v.scrollTop=h/2-v.clientHeight/2}else{v.scrollTop=L[sel]*h-v.clientHeight/2;v.scrollLeft=w/2-v.clientWidth/2}})}
+function setZ(n){z=n;box.style.width=n*100+'%';$('#zl').textContent='Zoom ×'+n;centerSel()}
+$('#zp').onclick=()=>setZ(Z[Math.min(Z.length-1,Z.indexOf(z)+1)]);
+$('#zm').onclick=()=>setZ(Z[Math.max(0,Z.indexOf(z)-1)]);
+function pick(d){const o=X.concat(Y);sel=o[(o.indexOf(sel)+d+o.length)%o.length];draw();centerSel()}
+$('#pv').onclick=()=>pick(-1);
+$('#nx').onclick=()=>pick(1);
+function hold(id,sg){
+  const b=$(id);let t;
+  const go=()=>{move(sel,L[sel]+sg*.001/z);draw()};
+  b.onpointerdown=e=>{e.preventDefault();clearTimeout(t);go();t=setTimeout(function f(){go();t=setTimeout(f,60)},350)};
+  b.onpointerup=b.onpointerleave=b.onpointercancel=()=>clearTimeout(t);
+  b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};
+  b.oncontextmenu=e=>e.preventDefault();
+}
+hold('#m',-1);hold('#p',1);
+
+/* résultats */
+function meas(s){
+  const l=s.L,lw=l.iL-l.oL,rw=l.oR-l.iR,tw=l.iT-l.oT,bw=l.oB-l.iB;
+  const lr=lw/(lw+rw)*100,tb=tw/(tw+bw)*100;
+  const x=Math.max(lr,100-lr),y=Math.max(tb,100-tb);
+  return{lr,tb,w1:Math.round(Math.max(x,y)),w2:Math.round(Math.min(x,y))};
+}
+const okF=(r,m)=>m.w1<=r[1]&&(r[3]==null||m.w2<=r[3]);
+const okB=(r,m)=>r[2]==null||m.w1<=r[2];
+function pickG(t,f,b){
+  for(const r of t)if((!f||okF(r,f))&&(!b||okB(r,b)))return r[0];
+  return null;
+}
+function results(){
+  const f=D.front&&meas(D.front),b=D.back&&meas(D.back);
+  if(!f&&!b){$('#res').innerHTML='';return}
+  const row=(n,m)=>'<div><b>'+n+'</b>'+(m?'<span class="n">G/D '+nf(m.lr>50?m.lr:100-m.lr)+' / '+nf(m.lr>50?100-m.lr:m.lr)+'</span><span class="n">H/B '+nf(m.tb>50?m.tb:100-m.tb)+' / '+nf(m.tb>50?100-m.tb:m.tb)+'</span>':'<span>non mesurée</span>')+'</div>';
+  let h='<div class="rw">'+row('Face avant',f)+row('Face arrière',b)+'</div><div class="gr">';
+  for(const n in T){
+    const t=T[n],lb=v=>v==null?NONE[n]:v;
+    h+='<div class="g"><span>'+n+'</span><b>'+lb(pickG(t,f,b))+'</b><small>'+(f?'Avant '+lb(pickG(t,f,null)):'')+(f&&b?' · ':'')+(b?'Arrière '+lb(pickG(t,null,b)):'')+'</small></div>';
+  }
+  h+='<div class="g"><span>CCC</span><b>—</b><small>seuils officiels introuvables</small></div>';
+  $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com ; Beckett : archive de mai 2026 ; CGC : cgccards.com). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit.</p>';
+}
+setSide('front');
+</script>
+</body>
+</html>
