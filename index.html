@@ -14,7 +14,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:"Avenir Next","Se
 main{max-width:520px;margin:0 auto;padding:16px}
 h1{font-size:1.4rem;margin:0 0 12px}
 h2{font-size:1rem;margin:16px 0 6px}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .tabs .b.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
 .cam{position:relative;width:100%;aspect-ratio:3/4;background:#000;overflow:hidden;border-radius:14px}
 video{width:100%;height:100%;object-fit:cover;display:block}
@@ -31,7 +31,9 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .gl{position:absolute;pointer-events:none;background:rgba(255,255,255,.4)}
 .gl.h{left:0;right:0;height:1px}
 .gl.v{top:0;bottom:0;width:1px}
-.gl.b{background:#ff5a5a;height:2px}
+.gl.b{background:rgba(255,70,70,.4);height:2px}
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+figure{margin:0}figure img{width:100%;border-radius:8px;display:block}figcaption{font-size:.85rem;color:var(--mu);margin-top:4px}
 canvas{width:100%;height:auto;display:block}
 .ln{position:absolute;touch-action:none}
 .ln::before{content:"";position:absolute;background:currentColor}
@@ -58,7 +60,7 @@ input[type=range]{width:100%}
 <body>
 <main>
 <h1>Centrage de carte</h1>
-<div class="tabs"><button id="tf" class="b on">Face avant</button><button id="tb" class="b">Face arrière</button></div>
+<div class="tabs"><button id="tf" class="b on">Face avant</button><button id="tb" class="b">Face arrière</button><button id="tr" class="b">Récap</button></div>
 
 <section id="s1">
   <div class="cam" id="cam"><video id="vid" playsinline muted></video><div id="fr" class="fr"></div></div>
@@ -72,19 +74,24 @@ input[type=range]{width:100%}
 
 <section id="s2" hidden>
   <h2>1. Redresser la photo</h2>
+  <p class="st">Fais pivoter la photo avec − et + jusqu’à ce que le bas de la carte soit parallèle à la ligne rouge.</p>
   <div class="vp" id="vp"><div class="box" id="box"><canvas id="cv"></canvas></div></div>
   <div class="nu"><button id="r1" class="b">−</button><span id="rl">Rotation 0,0°</span><button id="r2" class="b">+</button></div>
-  <input type="range" id="rot" min="-10" max="10" step="0.05" value="0">
+  <input type="range" id="rot" min="-10" max="10" step="0.01" value="0">
   <div class="row"><button id="aut" class="b p">Redresser automatiquement</button><button id="gr" class="b">Grille</button></div>
   <h2>2. Régler les lignes</h2>
   <p id="am" class="st"></p>
   <div class="lg"><span><i style="background:var(--o)"></i>Bord de la carte</span><span><i style="background:var(--i)"></i>Bord du cadre imprimé</span></div>
-  <div class="nu"><button id="zm" class="b">−</button><span id="zl">Zoom ×1</span><button id="zp" class="b">+</button></div>
-  <div class="nu"><button id="pv" class="b">‹</button><span id="lab"></span><button id="nx" class="b">›</button></div>
-  <div class="nu"><button id="m" class="b">−</button><span>Déplacer la ligne (maintiens pour répéter)</span><button id="p" class="b">+</button></div>
-  <div class="row"><button id="det" class="b">Détecter les bords</button><button id="again" class="b">Reprendre cette face</button></div>
+  <p class="st">Pince avec deux doigts pour zoomer, glisse un doigt pour déplacer la photo, et fais glisser une ligne pour la régler.</p>
+  <p id="live" class="st"></p>
+  <div class="row"><button id="next" class="b p">Suivant</button><button id="det" class="b">Détecter les bords</button><button id="again" class="b">Reprendre cette face</button></div>
 </section>
-<div id="res"></div>
+<section id="s3" hidden>
+  <h2>Récapitulatif de la carte</h2>
+  <div id="figs" class="figs"></div>
+  <div id="res"></div>
+  <div class="row"><button id="new" class="b p">Nouvelle carte</button></div>
+</section>
 </main>
 
 <script>
@@ -95,10 +102,9 @@ const X=['oL','iL','iR','oR'],Y=['oT','iT','iB','oB'];
 const NAMES={oL:'bord gauche de la carte',iL:'bord gauche du cadre',iR:'bord droit du cadre',oR:'bord droit de la carte',oT:'bord haut de la carte',iT:'bord haut du cadre',iB:'bord bas du cadre',oB:'bord bas de la carte'};
 const T={
   PSA:[['10',55,75],['9',60,90],['8',65,90],['7',70,90],['6',80,90],['5',85,90],['4',85,90],['3',90,90],['2',90,90],['1,5',90,90]],
-  Beckett:[['10 Pristine',50,60],['9,5',55,60,50],['9',55,70],['8',60,80],['7',65,90],['6',70,95],['5',75,95],['4',80,100],['3',85,100],['2',90,100]],
-  CGC:[['10 Pristine',50,null],['10 Gem Mint',55,75]]
+  Beckett:[['10 Pristine',50,60],['9,5',55,60,50],['9',55,70],['8',60,80],['7',65,90],['6',70,95],['5',75,95],['4',80,100],['3',85,100],['2',90,100]]
 };
-const NONE={PSA:'au-delà de 90/10',Beckett:'au-delà de 90/10',CGC:'sous le 10 (aucun seuil publié)'};
+const NONE={PSA:'au-delà de 90/10',Beckett:'au-delà de 90/10'};
 const D={front:null,back:null};
 let side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
 const Z=[1,2,3,4,6,8],NAME={front:'Face avant',back:'Face arrière'};
@@ -162,14 +168,19 @@ function addSide(c){
   let a=autoAngle(true);if(a==null)a=autoAngle(false);S.rot=a==null?0:Math.round(a*20)/20;
   render();detect(true);setSide(side);
 }
-function setSide(s){
-  side=s;S=D[s];
-  $('#tf').classList.toggle('on',s==='front');$('#tb').classList.toggle('on',s==='back');
+function tabs(v){
+  $('#tf').classList.toggle('on',v==='front');$('#tb').classList.toggle('on',v==='back');$('#tr').classList.toggle('on',v==='recap');
   $('#tf').textContent='Face avant'+(D.front?' ✓':'');$('#tb').textContent='Face arrière'+(D.back?' ✓':'');
+}
+function setSide(s){
+  $('#s3').hidden=true;
+  if(s==='recap'){showRecap();return}
+  side=s;S=D[s];tabs(s);
   if(S){
     stopCam();$('#s1').hidden=true;$('#s2').hidden=false;
     L=S.L;sel='iL';render();box.classList.add('grid');
     $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
+    $('#next').textContent=s==='front'?'Suivant : face arrière':'Suivant : récapitulatif';
     build();setZ(1);
   }else{
     $('#s2').hidden=true;$('#s1').hidden=false;fr.classList.remove('ok');
@@ -181,6 +192,9 @@ function setSide(s){
 }
 $('#tf').onclick=()=>setSide('front');
 $('#tb').onclick=()=>setSide('back');
+$('#tr').onclick=()=>setSide('recap');
+$('#next').onclick=()=>setSide(side==='front'?'back':'recap');
+$('#new').onclick=()=>{D.front=null;D.back=null;S=null;setSide('front')};
 $('#again').onclick=()=>{D[side]=null;setSide(side)};
 
 /* rotation */
@@ -210,13 +224,19 @@ function render(){
   S.o={l:mx/cw,r:(mx+X1-X0)/cw,t:my/ch,b:(my+Y1-Y0)/ch};
 }
 function rotApply(v){
-  S.rot=Math.max(-10,Math.min(10,Math.round(v*20)/20));
+  S.rot=Math.max(-10,Math.min(10,Math.round(v*100)/100));
   $('#rot').value=S.rot;$('#rl').textContent='Rotation '+nf2(S.rot)+'°';
   render();detect(true);draw();drawGrid();
 }
 $('#rot').oninput=e=>rotApply(+e.target.value);
-$('#r1').onclick=()=>rotApply(S.rot-.05);
-$('#r2').onclick=()=>rotApply(S.rot+.05);
+function holdRot(id,sg){
+  const b=$(id);let t;const go=()=>rotApply(S.rot+sg*.01);
+  b.onpointerdown=e=>{e.preventDefault();clearTimeout(t);go();t=setTimeout(function f(){go();t=setTimeout(f,70)},400)};
+  b.onpointerup=b.onpointerleave=b.onpointercancel=()=>clearTimeout(t);
+  b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};
+  b.oncontextmenu=e=>e.preventDefault();
+}
+holdRot('#r1',-1);holdRot('#r2',1);
 function drawGrid(){
   box.querySelectorAll('.gl').forEach(n=>n.remove());
   if(!S||!box.classList.contains('grid'))return;
@@ -354,11 +374,11 @@ function draw(){
     const k=d.dataset.k,p=L[k]*100+'%';
     if(d.classList.contains('v'))d.style.left=p;else d.style.top=p;
   });
-  $('#lab').textContent='Ligne choisie : '+NAMES[sel];
+  if(S){const m=meas(S);$('#live').textContent='Centrage de cette face : G/D '+rt(m.lr)+' · H/B '+rt(m.tb)}
   results();
 }
 const PT=new Map();let pan=null,pin=null;
-const zlab=()=>{$('#zl').textContent='Zoom ×'+(Math.round(z*10)/10).toString().replace('.',',')};
+const zlab=()=>{};
 function zoomAt(nz,mx,my){
   const v=$('#vp'),fx=(v.scrollLeft+mx)/box.offsetWidth,fy=(v.scrollTop+my)/box.offsetHeight;
   z=Math.max(1,Math.min(8,nz));box.style.width=z*100+'%';zlab();
@@ -389,20 +409,6 @@ box.onpointerup=box.onpointercancel=e=>{
 };
 function centerSel(){const v=$('#vp');requestAnimationFrame(()=>{const w=box.offsetWidth,h=box.offsetHeight;if(X.includes(sel)){v.scrollLeft=L[sel]*w-v.clientWidth/2;v.scrollTop=h/2-v.clientHeight/2}else{v.scrollTop=L[sel]*h-v.clientHeight/2;v.scrollLeft=w/2-v.clientWidth/2}})}
 function setZ(n){z=n;box.style.width=n*100+'%';zlab();centerSel()}
-$('#zp').onclick=()=>setZ(Z.find(v=>v>z+.01)||Z[Z.length-1]);
-$('#zm').onclick=()=>setZ(Z.slice().reverse().find(v=>v<z-.01)||1);
-function pick(d){const o=X.concat(Y);sel=o[(o.indexOf(sel)+d+o.length)%o.length];draw();centerSel()}
-$('#pv').onclick=()=>pick(-1);
-$('#nx').onclick=()=>pick(1);
-function hold(id,sg){
-  const b=$(id);let t;
-  const go=()=>{move(sel,L[sel]+sg*.001/z);draw()};
-  b.onpointerdown=e=>{e.preventDefault();clearTimeout(t);go();t=setTimeout(function f(){go();t=setTimeout(f,60)},350)};
-  b.onpointerup=b.onpointerleave=b.onpointercancel=()=>clearTimeout(t);
-  b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};
-  b.oncontextmenu=e=>e.preventDefault();
-}
-hold('#m',-1);hold('#p',1);
 
 /* résultats */
 function meas(s){
@@ -426,8 +432,29 @@ function results(){
     const t=T[n],lb=v=>v==null?NONE[n]:v;
     h+='<div class="g"><span>'+n+'</span><b>'+lb(pickG(t,f,b))+'</b><small>'+(f?'Avant '+lb(pickG(t,f,null)):'')+(f&&b?' · ':'')+(b?'Arrière '+lb(pickG(t,null,b)):'')+'</small></div>';
   }
-  h+='<div class="g"><span>CCC</span><b>—</b><small>seuils officiels introuvables</small></div>';
-  $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com ; Beckett : archive de mai 2026 ; CGC : cgccards.com). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit.</p>';
+  $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com ; Beckett : archive de mai 2026). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit.</p>';
+}
+function rt(v){return nf(v>50?v:100-v)+' / '+nf(v>50?100-v:v)}
+function thumb(){
+  const w=Math.min(400,cv.width),t=document.createElement('canvas');t.width=w;t.height=Math.round(cv.height*w/cv.width);
+  const c=t.getContext('2d');c.drawImage(cv,0,0,t.width,t.height);
+  const line=(col,x1,y1,x2,y2)=>{c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x1*t.width,y1*t.height);c.lineTo(x2*t.width,y2*t.height);c.stroke()};
+  for(const k of['oL','oR','iL','iR'])line(k[0]==='o'?'#ffc233':'#45c6ee',L[k],0,L[k],1);
+  for(const k of['oT','oB','iT','iB'])line(k[0]==='o'?'#ffc233':'#45c6ee',0,L[k],1,L[k]);
+  return t.toDataURL('image/jpeg',.8);
+}
+function showRecap(){
+  stopCam();tabs('recap');
+  $('#s1').hidden=true;$('#s2').hidden=true;$('#s3').hidden=false;
+  const keepS=S,keepL=L;let h='';
+  for(const k of['front','back']){
+    const t=D[k];
+    if(!t){h+='<figure><figcaption>'+NAME[k]+' : non mesurée</figcaption></figure>';continue}
+    S=t;L=t.L;render();const m=meas(t);
+    h+='<figure><img alt="'+NAME[k]+'" src="'+thumb()+'"><figcaption>'+NAME[k]+' · G/D '+rt(m.lr)+' · H/B '+rt(m.tb)+'</figcaption></figure>';
+  }
+  S=keepS;L=keepL;
+  $('#figs').innerHTML=h;results();
 }
 setSide('front');
 </script>
