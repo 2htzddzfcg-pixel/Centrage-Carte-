@@ -266,12 +266,34 @@ function rotated(){
   c.save();c.translate(w/2,h/2);c.rotate(S.rot*Math.PI/180);c.drawImage(s,-w/2,-h/2);c.restore();
   return t;
 }
+function edgeCands(p){
+  const n=p.length;
+  const sm=p.map((v,i)=>{const u=p[Math.max(0,i-1)],w=p[Math.min(n-1,i+1)];return[(u[0]+v[0]+w[0])/3,(u[1]+v[1]+w[1])/3,(u[2]+v[2]+w[2])/3]});
+  const g=sm.map((v,i)=>i>=2&&i<n-2?cd(sm[i+2],sm[i-2]):0);
+  const k=Math.max(2,Math.round(n*.01)),e=Math.floor(n*.3);
+  let m=0;for(let i=k;i<e;i++)if(g[i]>m)m=g[i];
+  if(m<40)return[];
+  const th=Math.max(40,.18*m),out=[];
+  for(let i=k;i<e;i++)if(g[i]>=th&&g[i]>=g[i-1]&&g[i]>=g[i+1]){
+    let sw=0,sx=0;for(let j=i-3;j<=i+3;j++){const w=g[j]||0;sw+=w;sx+=w*j}
+    const x=sx/sw,last=out[out.length-1];
+    if(last&&x-last.x<n*.012){if(g[i]>last.g){last.x=x;last.g=g[i]}}else out.push({x,g:g[i]});
+  }
+  return out.slice(0,4);
+}
 function outerBox(c){
-  const{d,w,h}=small(c,1200),p=prof(d,w,h,true,.3,.7),q=prof(d,w,h,false,.3,.7),tr=0;
-  const a=edgePos(p),b=edgePos(p.slice().reverse()),t=edgePos(q),u=edgePos(q.slice().reverse());
-  let x0=a==null?0:a/w+tr,x1=b==null?1:1-b/w-tr,y0=t==null?0:t/h+tr,y1=u==null?1:1-u/h-tr;
-  if(x1-x0<.3||y1-y0<.3){x0=0;x1=1;y0=0;y1=1}
-  return[x0,x1,y0,y1];
+  const{d,w,h}=small(c,1200),p=prof(d,w,h,true,.3,.7),q=prof(d,w,h,false,.3,.7);
+  const fb=[{x:0,g:0,fb:1}],A=l=>l.length?l:fb;
+  const L=A(edgeCands(p)),R=A(edgeCands(p.slice().reverse())),T=A(edgeCands(q)),B=A(edgeCands(q.slice().reverse()));
+  let best=null;
+  L.forEach((l,i)=>R.forEach((r,j)=>T.forEach((t,k)=>B.forEach((b,m)=>{
+    const W=w-r.x-l.x,H=h-b.x-t.x;
+    if(W<.3*w||H<.3*h)return;
+    const err=Math.abs(Math.log(W/H*88/63))+.006*(i+j+k+m)+((l.fb||0)+(r.fb||0)+(t.fb||0)+(b.fb||0))*.05;
+    if(!best||err<best.err)best={err,l:l.x,r:r.x,t:t.x,b:b.x};
+  }))));
+  if(!best)return[0,1,0,1];
+  return[best.l/w,1-best.r/w,best.t/h,1-best.b/h];
 }
 function render(){
   const t=rotated(),b=outerBox(t),w=t.width,h=t.height;
@@ -455,7 +477,7 @@ function draw(){
     const k=d.dataset.k,p=L[k]*100+'%';
     if(d.classList.contains('v'))d.style.left=p;else d.style.top=p;
   });
-  if(S){const m=meas(S);$('#live').innerHTML='Centrage de cette face : G/D '+rtc(m.lr,side)+' · H/B '+rtc(m.tb,side);shapeChk()}
+  if(S){const m=meas(S);$('#live').innerHTML='Centrage de cette face : G/D '+rtc(m.lr,side)+' · H/B '+rtc(m.tb,side)+'<br><span style="color:var(--mu)">Bordures : gauche '+nf((L.iL-L.oL)/(L.oR-L.oL)*63)+' · droite '+nf((L.oR-L.iR)/(L.oR-L.oL)*63)+' · haut '+nf((L.iT-L.oT)/(L.oB-L.oT)*88)+' · bas '+nf((L.oB-L.iB)/(L.oB-L.oT)*88)+' mm</span>';shapeChk()}
   results();
 }
 const PT=new Map();let pan=null,pin=null;
@@ -514,7 +536,7 @@ function results(){
     h+='<div class="g"><span>'+n+'</span><b>'+lb(pickG(t,f,b))+'</b><small>'+(f?'Avant '+lb(pickG(t,f,null)):'')+(f&&b?' · ':'')+(b?'Arrière '+lb(pickG(t,null,b)):'')+'</small></div>';
   }
   const ge=globalEst(f,b);
-  h+='<div class="g"><span>Note globale estimée (PSA)</span><b>'+ge.lbl+'</b><small>limitée par : '+ge.why+'</small></div>';
+  h+='<div class="g"><span>Note globale estimée (PSA)</span><b>'+ge.lbl+'</b><small>'+(ge.complete?'limitée par : '+ge.why:'plafond actuel : PSA '+ge.cap+' (centrage seul tant que coins, bords et surface ne sont pas notés)')+'</small></div>';
   $('#res').innerHTML=h+'</div><p class="nt">Note maximale permise par le centrage seul, d’après les seuils publiés (PSA : psacard.com). La note finale dépend aussi des coins, des bords et de la surface. PSA peut accorder 5 points de plus sur l’avant dès le 7 si l’aspect général est bon. Le rapport affiché est le côté le plus large sur le côté le plus étroit. Couleurs : vert si le centrage est conforme à un PSA 10 (55/45 au plus), rouge sinon, à l’avant comme à l’arrière. Règle choisie ici : un PSA 10 exige 55/45 sur les deux faces (PSA tolère officiellement jusqu’à 75/25 au dos). La note globale estimée prend la plus basse entre le centrage et ta liste de contrôle (coins, bords, surface) : elle reste indicative.</p>';
 }
 function rt(v){return nf(v>50?v:100-v)+' / '+nf(v>50?100-v:v)}
@@ -619,7 +641,10 @@ function globalEst(f,b){
     const v=D[k]&&D[k].chk&&D[k].chk[c];if(v)lim.push([c+' '+FR[k],+v]);
   }
   const m=Math.min(...lim.map(x=>x[1]));
-  return{m,lbl:String(m).replace('.',','),why:lim.filter(x=>x[1]===m).map(x=>x[0]).join(', ')};
+  let complete=true;
+  for(const k of['front','back'])if(D[k])for(const c of['coins','bords','surface'])if(!(D[k].chk&&D[k].chk[c]))complete=false;
+  const cap=String(m).replace('.',',');
+  return{m,complete,cap,lbl:complete?cap:'à évaluer',why:lim.filter(x=>x[1]===m).map(x=>x[0]).join(', ')};
 }
 /* historique */
 const HK='centrage-hist';
@@ -637,7 +662,7 @@ $('#sv').onclick=()=>{
 function histView(){
   const a=hload();
   $('#hclr').hidden=!a.length;
-  $('#hl').innerHTML=a.length?a.map(e=>'<div class="hi"><div class="ht">'+(e.imgF?'<img alt="" src="'+e.imgF+'">':'')+(e.imgB?'<img alt="" src="'+e.imgB+'">':'')+'</div><div class="hb"><b>'+esc(e.name)+'</b><small>'+esc(e.date)+'</small><span>Centrage PSA '+(e.psa==null?'—':esc(e.psa))+' · estimée '+esc(e.glob)+'</span>'+(e.f?'<span>Avant G/D '+rtc(e.f.lr,'front')+' · H/B '+rtc(e.f.tb,'front')+'</span>':'')+(e.b?'<span>Arrière G/D '+rtc(e.b.lr,'back')+' · H/B '+rtc(e.b.tb,'back')+'</span>':'')+'<button class="b" data-d="'+e.id+'">Supprimer</button></div></div>').join(''):'<p class="st">Aucune carte enregistrée pour le moment.</p>';
+  $('#hl').innerHTML=a.length?a.map(e=>'<div class="hi"><div class="ht">'+(e.imgF?'<img alt="" src="'+e.imgF+'">':'')+(e.imgB?'<img alt="" src="'+e.imgB+'">':'')+'</div><div class="hb"><b>'+esc(e.name)+'</b><small>'+esc(e.date)+'</small><span>Centrage : jusqu’à PSA '+(e.psa==null?'—':esc(e.psa))+'</span><span>Note globale : '+esc(e.glob)+'</span>'+(e.f?'<span>Avant G/D '+rtc(e.f.lr,'front')+' · H/B '+rtc(e.f.tb,'front')+'</span>':'')+(e.b?'<span>Arrière G/D '+rtc(e.b.lr,'back')+' · H/B '+rtc(e.b.tb,'back')+'</span>':'')+'<button class="b" data-d="'+e.id+'">Supprimer</button></div></div>').join(''):'<p class="st">Aucune carte enregistrée pour le moment.</p>';
 }
 $('#hl').onclick=e=>{
   const id=e.target.dataset&&e.target.dataset.d;if(!id)return;
