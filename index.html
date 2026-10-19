@@ -84,6 +84,12 @@ input[type=text],select{font:inherit;width:100%;box-sizing:border-box;padding:10
 .hi{display:flex;gap:10px;background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:8px}
 .ht{display:flex;flex-direction:column;gap:4px;width:70px;flex:none}.ht img{width:70px;border-radius:6px}
 .hb{display:flex;flex-direction:column;gap:3px;font-size:.85rem;min-width:0}.hb small{color:var(--mu)}
+.lv{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.75);background:rgba(0,0,0,.5);z-index:3;box-sizing:border-box}
+.lv i{position:absolute;background:rgba(255,255,255,.35)}
+.lv .lh{left:0;right:0;top:50%;height:1px}.lv .lvv{top:0;bottom:0;left:50%;width:1px}
+.lv .lt{left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border:1.5px solid #fff;border-radius:50%;background:transparent;box-sizing:border-box}
+.lv b{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff;box-shadow:0 0 6px rgba(0,0,0,.6);transition:transform .08s linear,background .2s}
+.lv.ok{border-color:#3ddc84}.lv.ok b{background:#3ddc84;box-shadow:0 0 10px #3ddc84}
 </style>
 </head>
 <body>
@@ -99,7 +105,7 @@ input[type=text],select{font:inherit;width:100%;box-sizing:border-box;padding:10
 <header id="hd" hidden><button id="back" class="b">←</button><h1 id="ttl">Face avant</h1><span id="stp"></span></header>
 
 <section id="s1">
-  <div class="cam" id="cam"><video id="vid" playsinline muted></video><div id="fr" class="fr"></div></div>
+  <div class="cam" id="cam"><video id="vid" playsinline muted></video><div id="fr" class="fr"></div><div id="lv" class="lv" hidden><i class="lt"></i><i class="lh"></i><i class="lvv"></i><b id="ball"></b></div></div>
   <p id="st" class="st"></p>
   <div class="row">
     <button id="go" class="b p">Ouvrir la caméra</button>
@@ -165,18 +171,23 @@ const T={
 };
 const NONE={PSA:'au-delà de 90/10'};
 const D={front:null,back:null},RT={front:'',back:''};
-let view='home',side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
+let bet=0,gam=0,view='home',side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
 const Z=[1,2,3,4,6,8],NAME={front:'Face avant',back:'Face arrière'};
 
 /* caméra et inclinaison */
 function upd(){
   fr.classList.toggle('ok',flat);
   $('#shot').disabled=sens&&!flat;
-  $('#st').textContent=NAME[side]+' : '+(!sens?'capteur d’inclinaison indisponible, aligne la carte dans le cadre.':flat?'téléphone à plat ('+nf(tilt)+'°), tu peux prendre la photo.':'inclinaison de '+nf(tilt)+'°, mets le téléphone bien à plat.');
+  const lv=$('#lv'),cl=(v,m)=>Math.max(-m,Math.min(m,v));
+  lv.hidden=!sens;lv.classList.toggle('ok',flat);
+  $('#ball').style.transform='translate('+cl(gam*4.5,24)+'px,'+cl(bet*4.5,24)+'px)';
+  let hint='';
+  if(!flat)hint=Math.abs(gam)>=Math.abs(bet)?(gam>0?'← penche vers la gauche':'penche vers la droite →'):(bet>0?'↑ penche vers le haut':'↓ penche vers le bas');
+  $('#st').textContent=NAME[side]+' : '+(!sens?'capteur d’inclinaison indisponible, aligne la carte dans le cadre.':flat?'téléphone à plat ('+nf(tilt)+'°), tu peux prendre la photo.':'inclinaison de '+nf(tilt)+'° : '+hint+' pour amener la bille au centre.');
 }
 function onOri(e){
   if(e.beta==null||e.gamma==null)return;
-  sens=true;tilt=Math.max(Math.abs(e.beta),Math.abs(e.gamma));flat=tilt<1;
+  sens=true;bet=e.beta;gam=e.gamma;tilt=Math.hypot(bet,gam);flat=tilt<1;
   if(stream)upd();
 }
 async function startCam(){
