@@ -90,6 +90,13 @@ input[type=text],select{font:inherit;width:100%;box-sizing:border-box;padding:10
 .lv .lt{left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border:1.5px solid #fff;border-radius:50%;background:transparent;box-sizing:border-box}
 .lv b{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff;box-shadow:0 0 6px rgba(0,0,0,.6);transition:transform .08s linear,background .2s}
 .lv.ok{border-color:#3ddc84}.lv.ok b{background:#3ddc84;box-shadow:0 0 10px #3ddc84}
+.gimg{display:block;width:100%;max-height:260px;object-fit:contain;border-radius:8px;background:#000;margin-top:8px}
+.gc{display:flex;gap:10px;align-items:center;width:100%;text-align:left;justify-content:flex-start;margin-top:6px;height:auto;padding:8px 10px}
+.gc img{width:44px;border-radius:4px;flex:none}.gc small{color:var(--mu)}
+.gp{font-size:2.2rem;font-weight:800;line-height:1.1}
+.gtab{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:8px}.gtab td{padding:4px 0;border-top:1px solid var(--bd)}.gtab td:last-child{text-align:right}
+.err{color:#f0443a}
+details{margin-top:16px}summary{cursor:pointer;color:var(--mu);padding:6px 0}
 </style>
 </head>
 <body>
@@ -99,6 +106,7 @@ input[type=text],select{font:inherit;width:100%;box-sizing:border-box;padding:10
   <h1 class="hero">Centrage carte</h1>
   <p class="st">Mesure le centrage de ta carte Pokémon, face avant puis face arrière, et vois la note maximale que le centrage permet chez PSA.</p>
   <button id="start" class="go">Faire analyser sa carte</button>
+  <button id="gcard" class="b wide">Estimer une carte gradée</button>
   <button id="hist" class="b wide">Historique</button>
   <p class="nt">Astuce : dans Safari, touche Partager puis « Sur l’écran d’accueil » pour l’installer comme une application.</p>
 </section>
@@ -148,6 +156,27 @@ input[type=text],select{font:inherit;width:100%;box-sizing:border-box;padding:10
   <input type="text" id="nm" placeholder="Nom de la carte (facultatif)">
   <div class="row"><button id="sv" class="b">Enregistrer dans l’historique</button></div>
   <button id="new" class="go">Nouvelle carte</button>
+</section>
+<section id="s5" hidden>
+  <p class="st">Photographie la capsule en entier, étiquette bien lisible. Le site lit la société, la note et la carte, puis affiche le prix estimé.</p>
+  <label class="go" style="display:flex;align-items:center;justify-content:center">Scanner la capsule<input type="file" id="gph" accept="image/*" capture="environment" hidden></label>
+  <img id="gimg" class="gimg" alt="" hidden>
+  <div id="gout"></div>
+  <div id="gres"></div>
+  <details id="gman"><summary>Corriger ou chercher à la main</summary>
+    <label class="fl">Nom de la carte (en anglais)<input type="text" id="gq" placeholder="Ex. Charizard ex"></label>
+    <button id="gs" class="b wide">Chercher la carte</button>
+    <div id="gsel" hidden>
+      <h2 id="gname"></h2>
+      <div class="ck"><label>Société de gradation<select id="gco"></select></label><label>Note<select id="ggr"></select></label></div>
+      <button id="ge" class="b wide">Estimer le prix</button>
+    </div>
+  </details>
+  <details id="gset"><summary>Réglages (clés API)</summary>
+    <label class="fl">Clé API Anthropic (lecture de l’étiquette)<input type="text" id="gak" placeholder="sk-ant-…"></label>
+    <label class="fl">Clé API PokemonPriceTracker (prix)<input type="text" id="gk" placeholder="Colle ta clé ici"></label>
+    <p class="nt">Les clés restent sur ton téléphone. La clé Anthropic se crée sur console.anthropic.com : l’usage est payant, quelques centimes par scan environ, donc mets-y un plafond de dépense. La clé PokemonPriceTracker est gratuite sur pokemonpricetracker.com (environ 100 crédits par jour).</p>
+  </details>
 </section>
 <section id="s4" hidden>
   <div id="hl"></div>
@@ -239,13 +268,14 @@ function addSide(c){
   render();detect(true);setSide(side);
 }
 function tabs(v){
-  const t={front:['Face avant','Étape 1/3'],back:['Face arrière','Étape 2/3'],recap:['Récapitulatif','Étape 3/3'],hist:['Historique','']}[v];
+  const t={front:['Face avant','Étape 1/3'],back:['Face arrière','Étape 2/3'],recap:['Récapitulatif','Étape 3/3'],hist:['Historique',''],graded:['Carte gradée','']}[v];
   $('#ttl').textContent=t[0];$('#stp').textContent=t[1];
 }
 function setSide(s){
   view=s;
-  if(s==='home'){stopCam();['#s1','#s2','#s3','#s4','#hd'].forEach(i=>$(i).hidden=true);$('#home').hidden=false;return}
-  $('#home').hidden=true;$('#hd').hidden=false;$('#s3').hidden=true;$('#s4').hidden=true;
+  if(s==='home'){stopCam();['#s1','#s2','#s3','#s4','#s5','#hd'].forEach(i=>$(i).hidden=true);$('#home').hidden=false;return}
+  $('#home').hidden=true;$('#hd').hidden=false;$('#s3').hidden=true;$('#s4').hidden=true;$('#s5').hidden=true;
+  if(s==='graded'){stopCam();tabs('graded');$('#s1').hidden=true;$('#s2').hidden=true;$('#s5').hidden=false;return}
   if(s==='hist'){stopCam();tabs('hist');$('#s1').hidden=true;$('#s2').hidden=true;$('#s4').hidden=false;histView();return}
   if(s==='recap'){showRecap();return}
   side=s;S=D[s];tabs(s);
@@ -681,6 +711,190 @@ $('#hl').onclick=e=>{
 };
 $('#hclr').onclick=()=>{if(confirm('Tout effacer ?')){hsave([]);histView()}};
 $('#hist').onclick=()=>setSide('hist');
+
+/* carte gradée : prix estimé d'après les ventes eBay */
+const GCO={PSA:['10','9','8','7','6','5','4','3','2','1'],BGS:['10','9.5','9','8.5','8','7.5','7','6.5','6','5.5','5','4.5','4'],CGC:['10','9.5','9','8.5','8','7.5','7','6.5','6','5.5','5'],SGC:['10','9.5','9','8.5','8','7.5','7','6','5','4'],CCC:['10','9.5','9','8.5','8','7.5','7']};
+const PPT='https://www.pokemonpricetracker.com/api/v2/cards';
+const lsget=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsset=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+let GRES=[],gcur=null;
+$('#gk').value=lsget('ppt-key')||'';
+$('#gk').oninput=e=>lsset('ppt-key',e.target.value.trim());
+$('#gak').value=lsget('ant-key')||'';
+$('#gak').oninput=e=>lsset('ant-key',e.target.value.trim());
+if(!lsget('ant-key')||!lsget('ppt-key'))$('#gset').open=true;
+$('#gco').innerHTML=Object.keys(GCO).map(c=>'<option>'+c+'</option>').join('');
+function gfill(extra){const l=GCO[$('#gco').value].slice();if(extra&&!l.includes(extra))l.push(extra);$('#ggr').innerHTML=l.map(g=>'<option>'+g+'</option>').join('')}
+$('#gco').onchange=gfill;gfill();
+$('#gcard').onclick=()=>setSide('graded');
+$('#gph').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const im=new Image();
+  im.onload=()=>{
+    const s=Math.min(1,1400/Math.max(im.width,im.height)),k=document.createElement('canvas');
+    k.width=Math.round(im.width*s);k.height=Math.round(im.height*s);
+    k.getContext('2d').drawImage(im,0,0,k.width,k.height);URL.revokeObjectURL(im.src);
+    const u=k.toDataURL('image/jpeg',.88);$('#gimg').src=u;$('#gimg').hidden=false;autoScan(u);
+  };
+  im.src=URL.createObjectURL(f);e.target.value='';
+};
+async function ppt(qs){
+  const k=lsget('ppt-key')||'';
+  if(!k)throw new Error('Entre d’abord ta clé API (en bas de la page).');
+  let r;
+  try{r=await fetch(PPT+'?'+qs,{headers:{Authorization:'Bearer '+k}})}
+  catch(e){throw new Error('Impossible de joindre le service de prix (réseau, ou accès bloqué par le navigateur).')}
+  if(r.status===401||r.status===403)throw new Error('Clé API refusée : vérifie-la.');
+  if(r.status===429)throw new Error('Limite quotidienne atteinte : réessaie demain.');
+  if(!r.ok)throw new Error('Erreur du service de prix ('+r.status+').');
+  return r.json();
+}
+const cardList=j=>Array.isArray(j)?j:Array.isArray(j&&j.data)?j.data:(j&&j.data)?[j.data]:[];
+const gimgOf=c=>c.imageUrl||c.image||(c.images&&(c.images.small||c.images.large))||'';
+const gset=c=>c.setName||(c.set&&c.set.name)||c.setId||'';
+const gnum=c=>c.cardNumber||c.number||'';
+const gid=c=>c.tcgPlayerId||c.id||'';
+$('#gs').onclick=async()=>{
+  const q=$('#gq').value.trim();if(!q)return;
+  const o=$('#gres');o.innerHTML='<p class="st">Recherche…</p>';$('#gsel').hidden=true;$('#gout').innerHTML='';
+  try{
+    GRES=cardList(await ppt('search='+encodeURIComponent(q)+'&limit=6'));
+    o.innerHTML=GRES.length?GRES.map((c,i)=>'<button class="b gc" data-i="'+i+'">'+(gimgOf(c)?'<img alt="" src="'+esc(gimgOf(c))+'">':'')+'<span><b>'+esc(c.name||'?')+'</b><br><small>'+esc(gset(c))+(gnum(c)?' · n° '+esc(gnum(c)):'')+'</small></span></button>').join(''):'<p class="st">Aucune carte trouvée. Essaie le nom en anglais.</p>';
+  }catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>'}
+};
+$('#gres').onclick=e=>{
+  const b=e.target.closest&&e.target.closest('button[data-i]');if(!b)return;
+  gcur=GRES[+b.dataset.i];
+  $('#gname').textContent=(gcur.name||'')+' · '+gset(gcur)+(gnum(gcur)?' · n° '+gnum(gcur):'');
+  $('#gsel').hidden=false;$('#gout').innerHTML='';
+  if(GREAD&&GREAD.co&&GREAD.gr)gshow(gcur,GREAD.co,GREAD.gr,GREAD.head);
+};
+/* normalise les notes d'une carte : psa10, bgs95, cgc10... */
+function gnorm(sb){
+  const m={};
+  for(const k in(sb||{})){
+    const e=sb[k];
+    m[k.toLowerCase().replace(/[^a-z0-9]/g,'')]=(e&&typeof e==='object')?e:{medianPrice:+e};
+  }
+  return m;
+}
+const gtarget=(co,gr)=>co.toLowerCase()+String(gr).replace('.','');
+function gpretty(key){
+  const co=key.slice(0,3).toUpperCase();let r=key.slice(3);
+  if(r.length===2&&r[1]==='5')r=r[0]+','+r[1];
+  return co+' '+r;
+}
+function gothers(m,co){
+  const c=co.toLowerCase();
+  return Object.keys(m).filter(k=>k.startsWith(c)&&m[k]&&m[k].medianPrice>0)
+    .sort((a,b)=>parseFloat(b.slice(3).replace(/^(\d)5$/,'$1.5'))-parseFloat(a.slice(3).replace(/^(\d)5$/,'$1.5')));
+}
+const usd=v=>v.toLocaleString('fr-FR',{style:'currency',currency:'USD',maximumFractionDigits:v<100?2:0});
+const eur=v=>v.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:v<100?2:0});
+async function fx(){
+  try{const c=JSON.parse(lsget('fx-usdeur')||'null');if(c&&Date.now()-c.t<43200000)return c.r}catch(e){}
+  try{
+    const r=await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR'),j=await r.json(),v=j.rates&&j.rates.EUR;
+    if(v){lsset('fx-usdeur',JSON.stringify({t:Date.now(),r:v}));return v}
+  }catch(e){}
+  return null;
+}
+async function gsales(c){
+  const id=gid(c),key='ppt-c-'+id;
+  try{const k=JSON.parse(lsget(key)||'null');if(k&&Date.now()-k.t<43200000)return k.d}catch(e){}
+  const a=cardList(await ppt('tcgPlayerId='+encodeURIComponent(id)+'&includeEbay=true'));
+  const e=a[0]&&a[0].ebay,sb=e&&(e.salesByGrade||e.prices)||{},d={};
+  for(const k in sb){const v=sb[k];d[k]=(v&&typeof v==='object')?{count:v.count,medianPrice:v.medianPrice,averagePrice:v.averagePrice,minPrice:v.minPrice,maxPrice:v.maxPrice,smartMarketPrice:v.smartMarketPrice,lastSaleDate:v.lastSaleDate}:v}
+  lsset(key,JSON.stringify({t:Date.now(),d}));
+  return d;
+}
+async function gshow(c,co,gr,pre){
+  pre=pre||'';const o=$('#gout');
+  if(co==='CCC'){o.innerHTML=pre+'<p class="st err">Le service de prix ne fournit pas de ventes pour CCC. Pour estimer, choisis PSA, BGS, CGC ou SGC dans « Corriger ».</p>';return}
+  o.innerHTML=pre+'<p class="st">Calcul du prix…</p>';
+  try{
+    const m=gnorm(await gsales(c)),e=m[gtarget(co,gr)],rate=await fx();
+    const name='<b>'+esc(c.name||'')+'</b> · '+esc(gset(c))+(gnum(c)?' · n° '+esc(gnum(c)):'')+' · '+esc(co)+' '+esc(gr);
+    const oth=gothers(m,co).map(k=>'<tr><td>'+gpretty(k)+'</td><td>'+usd(m[k].medianPrice)+(rate?' · ≈ '+eur(m[k].medianPrice*rate):'')+'</td></tr>').join('');
+    if(!e||!(e.medianPrice>0)){
+      o.innerHTML=pre+'<p class="st">'+name+' : aucune vente récente trouvée pour cette note.</p>'+(oth?'<p class="nt">Notes avec des ventes pour '+co+' :</p><table class="gtab">'+oth+'</table>':'<p class="nt">Aucune vente trouvée pour cette carte chez '+co+'.</p>');
+      return;
+    }
+    const sm=e.smartMarketPrice&&e.smartMarketPrice.price;
+    o.innerHTML=pre+'<div class="g"><span>'+name+'</span><div class="gp">'+usd(e.medianPrice)+'</div>'+(rate?'<div>≈ '+eur(e.medianPrice*rate)+'</div>':'')+'<small>Prix médian des ventes eBay récentes'+(e.count?' ('+e.count+' vente'+(e.count>1?'s':'')+')':'')+'</small>'+
+      '<table class="gtab">'+(e.averagePrice?'<tr><td>Moyenne</td><td>'+usd(e.averagePrice)+'</td></tr>':'')+((e.minPrice!=null&&e.maxPrice!=null)?'<tr><td>Fourchette</td><td>'+usd(e.minPrice)+' à '+usd(e.maxPrice)+'</td></tr>':'')+(sm?'<tr><td>Prix du marché estimé'+(e.smartMarketPrice.confidence?' (confiance '+esc(e.smartMarketPrice.confidence)+')':'')+'</td><td>'+usd(sm)+'</td></tr>':'')+(e.lastSaleDate?'<tr><td>Dernière vente</td><td>'+new Date(e.lastSaleDate).toLocaleDateString('fr-FR')+'</td></tr>':'')+'</table></div>'+
+      (oth?'<p class="nt">Autres notes '+co+' :</p><table class="gtab">'+oth+'</table>':'')+
+      '<p class="nt">Estimation indicative d’après des ventes passées. Peu de ventes ou une grande fourchette veulent dire un prix peu fiable.</p>';
+  }catch(err){o.innerHTML=pre+'<p class="st err">'+esc(err.message)+'</p>'}
+}
+$('#ge').onclick=()=>{if(gcur)gshow(gcur,$('#gco').value,$('#ggr').value,'')};
+
+/* scan automatique de la capsule (lecture par Anthropic) */
+const ANT_MODEL='claude-sonnet-5-5';
+const GPROMPT='Cette photo montre une carte Pokémon gradée dans sa capsule (PSA, BGS/Beckett, CGC, SGC, CCC…). Lis l’étiquette et regarde la carte. Réponds UNIQUEMENT avec un objet JSON, sans texte autour : {"company":"PSA, BGS, CGC, SGC, CCC ou vide","grade":"la note, par exemple 10 ou 9.5","name_fr":"nom de la carte tel qu’imprimé","name_en":"nom anglais le plus probable de la carte, pour une recherche dans une base de données","set":"extension ou code","number":"numéro de carte, par exemple 033/182","year":"année","cert":"numéro de certification"}. Si une valeur est illisible ou absente, mets une chaîne vide. N’invente rien.';
+let GREAD=null;
+async function readSlab(url){
+  const k=lsget('ant-key')||'';
+  if(!k)throw new Error('Entre ta clé Anthropic dans les réglages, en bas de la page.');
+  let r;
+  try{
+    r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:ANT_MODEL,max_tokens:500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:url.split(',')[1]}},{type:'text',text:GPROMPT}]}]})});
+  }catch(e){throw new Error('Impossible de joindre le service de lecture (réseau).')}
+  if(r.status===401)throw new Error('Clé Anthropic refusée : vérifie-la.');
+  if(r.status===429)throw new Error('Trop de demandes : réessaie dans un instant.');
+  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error('Erreur du service de lecture ('+r.status+')'+(m?' : '+m:'')+'.')}
+  const j=await r.json(),t=(j.content||[]).map(c=>c.text||'').join(''),m=t.match(/\{[\s\S]*\}/);
+  if(!m)throw new Error('Lecture impossible : reprends la photo.');
+  try{return JSON.parse(m[0])}catch(e){throw new Error('Lecture impossible : reprends la photo.')}
+}
+function gco2(s){
+  const t=String(s||'').toUpperCase();
+  return t.includes('BECKETT')||/\bBGS\b/.test(t)?'BGS':/\bPSA\b/.test(t)?'PSA':/\bCGC\b/.test(t)?'CGC':/\bSGC\b/.test(t)?'SGC':/\bCCC\b/.test(t)?'CCC':'';
+}
+function ggr2(g){const m=String(g||'').replace(',','.').match(/\d+(\.\d)?/);return m?m[0]:''}
+function gresHtml(a){
+  return a.map((c,i)=>'<button class="b gc" data-i="'+i+'">'+(gimgOf(c)?'<img alt="" src="'+esc(gimgOf(c))+'">':'')+'<span><b>'+esc(c.name||'?')+'</b><br><small>'+esc(gset(c))+(gnum(c)?' · n° '+esc(gnum(c)):'')+'</small></span></button>').join('');
+}
+function pickCard(a,d){
+  if(!a.length)return null;
+  if(a.length===1)return a[0];
+  const n=parseInt(String(d.number||'').split('/')[0],10),st=String(d.set||'').toLowerCase();
+  const sc=a.map(c=>{
+    let v=0;const cn=parseInt(String(gnum(c)).split('/')[0],10);
+    if(!isNaN(n)&&cn===n)v+=2;
+    if(st&&gset(c).toLowerCase().split(/\s+/).some(w=>w.length>3&&st.includes(w)))v+=1;
+    return v;
+  });
+  const m=Math.max(...sc);
+  return m>=2&&sc.filter(x=>x===m).length===1?a[sc.indexOf(m)]:null;
+}
+async function autoScan(url){
+  const o=$('#gout');GREAD=null;gcur=null;$('#gres').innerHTML='';$('#gsel').hidden=true;
+  o.innerHTML='<p class="st">Lecture de l’étiquette…</p>';
+  let d;
+  try{d=await readSlab(url)}catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>';return}
+  const co=gco2(d.company),gr=ggr2(d.grade);
+  const head='<div class="g"><span>Lu sur l’étiquette</span><b>'+esc(co||'société ?')+' '+esc(gr)+'</b><small>'+esc(d.name_fr||d.name_en||'carte ?')+(d.number?' · n° '+esc(d.number):'')+(d.set?' · '+esc(d.set):'')+'</small></div>';
+  GREAD={co,gr,d,head};
+  $('#gq').value=d.name_en||d.name_fr||'';
+  if(co&&GCO[co]){$('#gco').value=co;gfill(gr);if(gr)$('#ggr').value=gr}
+  if(!co||!gr){o.innerHTML=head+'<p class="st err">Je n’ai pas pu lire la société ou la note. Reprends la photo plus nette, étiquette bien visible, ou corrige à la main ci-dessous.</p>';$('#gman').open=true;return}
+  const q=d.name_en||d.name_fr;
+  if(!q){o.innerHTML=head+'<p class="st err">Nom de la carte illisible. Corrige à la main ci-dessous.</p>';$('#gman').open=true;return}
+  o.innerHTML=head+'<p class="st">Recherche de la carte…</p>';
+  try{
+    GRES=cardList(await ppt('search='+encodeURIComponent(q)+'&limit=8'));
+    if(!GRES.length){o.innerHTML=head+'<p class="st err">Carte introuvable dans la base. Corrige le nom (en anglais) à la main ci-dessous.</p>';$('#gman').open=true;return}
+    const best=pickCard(GRES,d);
+    if(best){
+      gcur=best;$('#gname').textContent=(best.name||'')+' · '+gset(best)+(gnum(best)?' · n° '+gnum(best):'');$('#gsel').hidden=false;
+      await gshow(best,co,gr,head);
+    }else{
+      o.innerHTML=head+'<p class="st">Plusieurs cartes possibles : touche la bonne.</p>';
+      $('#gres').innerHTML=gresHtml(GRES);
+    }
+  }catch(err){o.innerHTML=head+'<p class="st err">'+esc(err.message)+'</p>'}
+}
 setSide('home');
 </script>
 </body>
