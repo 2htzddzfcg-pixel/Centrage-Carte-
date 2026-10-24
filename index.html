@@ -106,7 +106,9 @@ details{margin-top:16px}summary{cursor:pointer;color:var(--mu);padding:6px 0}
   <h1 class="hero">Centrage carte</h1>
   <p class="st">Mesure le centrage de ta carte Pokémon, face avant puis face arrière, et vois la note maximale que le centrage permet chez PSA.</p>
   <button id="start" class="go">Faire analyser sa carte</button>
-  <button id="gcard" class="b wide">Estimer une carte gradée</button>
+  <button id="scan" class="go">Scanner une carte</button>
+  <button id="coll" class="b wide">Ma collection</button>
+  <button id="gcard" class="b wide">Carte gradée (avancé)</button>
   <button id="hist" class="b wide">Historique</button>
   <p class="nt">Astuce : dans Safari, touche Partager puis « Sur l’écran d’accueil » pour l’installer comme une application.</p>
 </section>
@@ -157,6 +159,21 @@ details{margin-top:16px}summary{cursor:pointer;color:var(--mu);padding:6px 0}
   <div class="row"><button id="sv" class="b">Enregistrer dans l’historique</button></div>
   <button id="new" class="go">Nouvelle carte</button>
 </section>
+<section id="s6" hidden>
+  <img id="cimg" class="gimg" alt="" hidden>
+  <div id="cout"></div>
+  <div id="cres"></div>
+  <div class="row"><button id="csv" class="b" hidden>Ajouter à ma collection</button></div>
+  <details id="cman"><summary>Corriger la recherche</summary>
+    <label class="fl">Nom de la carte<input type="text" id="cq" placeholder="Ex. Feurisson"></label>
+    <button id="cs" class="b wide">Chercher</button>
+  </details>
+  <button id="cagain" class="go">Scanner une autre carte</button>
+</section>
+<section id="s7" hidden>
+  <div id="cl"></div>
+  <button id="cclr" class="b wide">Tout effacer</button>
+</section>
 <section id="s5" hidden>
   <p class="st">Photographie la capsule en entier, étiquette bien lisible. Le site lit la société, la note et la carte, puis affiche le prix estimé.</p>
   <label class="go" style="display:flex;align-items:center;justify-content:center">Scanner la capsule<input type="file" id="gph" accept="image/*" capture="environment" hidden></label>
@@ -200,7 +217,7 @@ const T={
 };
 const NONE={PSA:'au-delà de 90/10'};
 const D={front:null,back:null},RT={front:'',back:''};
-let bet=0,gam=0,view='home',side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
+let mode='face',bet=0,gam=0,view='home',side='front',S=null,L={},stream=null,wantCam=false,flat=false,sens=false,tilt=0,sel='oL',drag=null,z=1;
 const Z=[1,2,3,4,6,8],NAME={front:'Face avant',back:'Face arrière'};
 
 /* caméra et inclinaison */
@@ -212,7 +229,7 @@ function upd(){
   $('#ball').style.transform='translate('+cl(gam*4.5,24)+'px,'+cl(bet*4.5,24)+'px)';
   let hint='';
   if(!flat)hint=Math.abs(gam)>=Math.abs(bet)?(gam>0?'← penche vers la gauche':'penche vers la droite →'):(bet>0?'↑ penche vers le haut':'↓ penche vers le bas');
-  $('#st').textContent=NAME[side]+' : '+(!sens?'capteur d’inclinaison indisponible, aligne la carte dans le cadre.':flat?'téléphone à plat ('+nf(tilt)+'°), tu peux prendre la photo.':'inclinaison de '+nf(tilt)+'° : '+hint+' pour amener la bille au centre.');
+  $('#st').textContent=(mode==='id'?'Scanner une carte':NAME[side])+' : '+(!sens?'capteur d’inclinaison indisponible, aligne la carte dans le cadre.':flat?'téléphone à plat ('+nf(tilt)+'°), tu peux prendre la photo.':'inclinaison de '+nf(tilt)+'° : '+hint+' pour amener la bille au centre.');
 }
 function onOri(e){
   if(e.beta==null||e.gamma==null)return;
@@ -244,7 +261,7 @@ $('#shot').onclick=()=>{
   const sw=Math.min(vw-sx,fw/s),sh=Math.min(vh-sy,fh/s);
   const k=document.createElement('canvas');k.width=Math.round(sw);k.height=Math.round(sh);
   k.getContext('2d').drawImage(vid,sx,sy,sw,sh,0,0,k.width,k.height);
-  addSide(k);
+  take(k);
 };
 $('#file').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
@@ -254,12 +271,13 @@ $('#file').onchange=e=>{
     const k=document.createElement('canvas');k.width=Math.round(im.width*s);k.height=Math.round(im.height*s);
     k.getContext('2d').drawImage(im,0,0,k.width,k.height);
     URL.revokeObjectURL(im.src);
-    addSide(k);
+    take(k);
   };
   im.src=URL.createObjectURL(f);e.target.value='';
 };
 
 /* faces */
+const take=k=>mode==='id'?identify(k):addSide(k);
 function addSide(c){
   const p=c.getContext('2d').getImageData(2,2,1,1).data;
   D[side]=S={raw:c,rot:0,dy:0,chk:{},rk:null,bg:'#101010',L:{oL:0,iL:.07,iR:.93,oR:1,oT:0,iT:.05,iB:.95,oB:1}};
@@ -268,17 +286,26 @@ function addSide(c){
   render();detect(true);setSide(side);
 }
 function tabs(v){
-  const t={front:['Face avant','Étape 1/3'],back:['Face arrière','Étape 2/3'],recap:['Récapitulatif','Étape 3/3'],hist:['Historique',''],graded:['Carte gradée','']}[v];
+  const t={front:['Face avant','Étape 1/3'],back:['Face arrière','Étape 2/3'],recap:['Récapitulatif','Étape 3/3'],hist:['Historique',''],graded:['Carte gradée',''],scan:['Scanner une carte',''],card:['Carte reconnue',''],coll:['Ma collection','']}[v];
   $('#ttl').textContent=t[0];$('#stp').textContent=t[1];
 }
 function setSide(s){
   view=s;
-  if(s==='home'){stopCam();['#s1','#s2','#s3','#s4','#s5','#hd'].forEach(i=>$(i).hidden=true);$('#home').hidden=false;return}
-  $('#home').hidden=true;$('#hd').hidden=false;$('#s3').hidden=true;$('#s4').hidden=true;$('#s5').hidden=true;
+  if(s==='home'){stopCam();['#s1','#s2','#s3','#s4','#s5','#s6','#s7','#hd'].forEach(i=>$(i).hidden=true);$('#home').hidden=false;return}
+  $('#home').hidden=true;$('#hd').hidden=false;$('#s3').hidden=true;$('#s4').hidden=true;$('#s5').hidden=true;$('#s6').hidden=true;$('#s7').hidden=true;
+  if(s==='scan'){
+    mode='id';tabs('scan');$('#s1').hidden=false;$('#s2').hidden=true;fr.classList.remove('ok');
+    $('#go').hidden=wantCam;$('#shot').hidden=!wantCam;
+    $('#st').textContent='Scanner une carte : pose la carte à plat, le téléphone à plat au-dessus, puis ouvre la caméra.';
+    if(wantCam&&!stream)startCam();
+    return;
+  }
+  if(s==='card'){stopCam();tabs('card');$('#s1').hidden=true;$('#s2').hidden=true;$('#s6').hidden=false;return}
+  if(s==='coll'){stopCam();tabs('coll');$('#s1').hidden=true;$('#s2').hidden=true;$('#s7').hidden=false;collView();return}
   if(s==='graded'){stopCam();tabs('graded');$('#s1').hidden=true;$('#s2').hidden=true;$('#s5').hidden=false;return}
   if(s==='hist'){stopCam();tabs('hist');$('#s1').hidden=true;$('#s2').hidden=true;$('#s4').hidden=false;histView();return}
   if(s==='recap'){showRecap();return}
-  side=s;S=D[s];tabs(s);
+  side=s;mode='face';S=D[s];tabs(s);
   if(S){
     stopCam();$('#s1').hidden=true;$('#s2').hidden=false;
     L=S.L;sel='iL';render();box.classList.add('grid');
@@ -295,7 +322,7 @@ function setSide(s){
   results();
 }
 $('#start').onclick=()=>{D.front=null;D.back=null;S=null;setSide('front');startCam()};
-$('#back').onclick=()=>setSide(view==='recap'?'back':view==='back'?'front':'home');
+$('#back').onclick=()=>setSide(view==='recap'?'back':view==='back'?'front':view==='card'?'scan':'home');
 $('#next').onclick=()=>setSide(side==='front'?'back':'recap');
 $('#new').onclick=()=>{D.front=null;D.back=null;S=null;setSide('home')};
 $('#again').onclick=()=>{D[side]=null;setSide(side)};
@@ -895,6 +922,185 @@ async function autoScan(url){
     }
   }catch(err){o.innerHTML=head+'<p class="st err">'+esc(err.message)+'</p>'}
 }
+
+/* scan gratuit : lecture du texte dans le navigateur + base TCGdex (sans clé) */
+const TD='https://api.tcgdex.net/v2/fr';
+let CARDS=[],CUR=null;
+async function td(path){
+  let r;
+  try{r=await fetch(TD+path)}catch(e){throw new Error('Impossible de joindre la base de cartes (réseau).')}
+  if(!r.ok)throw new Error('Base de cartes indisponible ('+r.status+').');
+  return r.json();
+}
+async function tdSets(){
+  try{const c=JSON.parse(lsget('td-sets')||'null');if(c&&Date.now()-c.t<6048e5)return c.d}catch(e){}
+  const a=await td('/sets');
+  const d=a.map(x=>({id:x.id,name:x.name,off:x.cardCount&&x.cardCount.official,tot:x.cardCount&&x.cardCount.total}));
+  lsset('td-sets',JSON.stringify({t:Date.now(),d}));return d;
+}
+function loadTess(){
+  return new Promise((res,rej)=>{
+    if(window.Tesseract)return res(window.Tesseract);
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    sc.onload=()=>res(window.Tesseract);
+    sc.onerror=()=>rej(new Error('Impossible de charger le lecteur de texte (réseau).'));
+    document.head.appendChild(sc);
+  });
+}
+function cardCrop(k){
+  const keep=S;
+  S={raw:k,rot:0,dy:0,bg:'#101010'};
+  try{
+    const a=autoAngle(true);S.rot=a==null?0:Math.round(a*20)/20;
+    const t=rotated(),b=outerBox(t),w=t.width,h=t.height;
+    const x0=Math.round(b[0]*w),y0=Math.round(b[2]*h),cw=Math.round(b[1]*w)-x0,ch=Math.round(b[3]*h)-y0;
+    const c=document.createElement('canvas');c.width=cw;c.height=ch;
+    c.getContext('2d').drawImage(t,x0,y0,cw,ch,0,0,cw,ch);
+    return c;
+  }finally{S=keep}
+}
+function regionCanvas(c,x0,y0,x1,y1,sc){
+  const w=Math.round((x1-x0)*c.width),h=Math.round((y1-y0)*c.height),t=document.createElement('canvas');
+  t.width=Math.round(w*sc);t.height=Math.round(h*sc);
+  const g=t.getContext('2d');g.drawImage(c,x0*c.width,y0*c.height,w,h,0,0,t.width,t.height);
+  const im=g.getImageData(0,0,t.width,t.height),d=im.data;let lo=255,hi=0;
+  for(let i=0;i<d.length;i+=4){const v=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=v;if(v<lo)lo=v;if(v>hi)hi=v}
+  const k=hi>lo?255/(hi-lo):1;
+  for(let i=0;i<d.length;i+=4){const v=Math.max(0,Math.min(255,(d[i]-lo)*k));d[i]=d[i+1]=d[i+2]=v}
+  g.putImageData(im,0,0);return t;
+}
+async function ocrAll(card){
+  const T=await loadTess(),w=await T.createWorker('fra');
+  try{
+    await w.setParameters({tessedit_pageseg_mode:'7'});
+    const name=(await w.recognize(regionCanvas(card,.12,.03,.85,.125,2.5))).data.text;
+    await w.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789/ ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'});
+    const nums=[];
+    for(const r of[[.02,.9,.5,.995],[.5,.9,.98,.995]])nums.push((await w.recognize(regionCanvas(card,r[0],r[1],r[2],r[3],3))).data.text);
+    return{name,nums};
+  }finally{try{await w.terminate()}catch(e){}}
+}
+function parseNum(a){
+  for(const t0 of a){
+    const t=String(t0||'').replace(/[Oo]/g,'0').replace(/[lI|]/g,'1');
+    const m=t.match(/(\d{1,3})\s*\/\s*(\d{2,3})/);
+    if(m)return{n:parseInt(m[1],10),t:parseInt(m[2],10)};
+  }
+  return null;
+}
+const strip=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+function cleanName(t){return String(t||'').replace(/[^A-Za-zÀ-ÿ’' -]/g,' ').replace(/\s+/g,' ').trim()}
+function tokenFor(nm){
+  const w=strip(nm).split(' ').filter(x=>x.length>=4).sort((a,b)=>b.length-a.length);
+  return w[0]||'';
+}
+function bigrams(t){const s=' '+strip(t)+' ',r=new Map();for(let i=0;i<s.length-1;i++){const g=s.slice(i,i+2);r.set(g,(r.get(g)||0)+1)}return r}
+function sim(a,b){
+  const A=bigrams(a),B=bigrams(b);let inter=0,na=0,nb=0;
+  A.forEach((v,k)=>{na+=v;if(B.has(k))inter+=Math.min(v,B.get(k))});B.forEach(v=>{nb+=v});
+  return na+nb?2*inter/(na+nb):0;
+}
+function bestByName(c,nm){
+  if(c.length===1)return c[0];
+  if(!nm)return null;
+  const sc=c.map(x=>sim(x.name,nm)),o=sc.slice().sort((a,b)=>b-a);
+  return o[0]>=.55&&(o[0]-(o[1]||0)>=.1)?c[sc.indexOf(o[0])]:null;
+}
+async function findCards(nm,nn){
+  let c=[];
+  if(nn){
+    const sets=(await tdSets()).filter(x=>x.off===nn.t||x.tot===nn.t);
+    for(const x of sets.slice(0,6)){
+      const f=await td('/sets/'+encodeURIComponent(x.id)),y=(f.cards||[]).find(z=>parseInt(z.localId,10)===nn.n);
+      if(y)c.push(y);
+    }
+  }
+  if(!c.length&&nm){
+    const w=tokenFor(nm);
+    if(w){
+      c=(await td('/cards?name='+encodeURIComponent(w))).slice(0,60);
+      if(nn){const f=c.filter(z=>parseInt(z.localId,10)===nn.n);if(f.length)c=f}
+    }
+  }
+  return c;
+}
+const listHtml=a=>a.slice(0,8).map((c,i)=>'<button class="b gc" data-i="'+i+'">'+(c.image?'<img alt="" src="'+esc(c.image)+'/low.png">':'')+'<span><b>'+esc(c.name)+'</b><br><small>'+esc(c.id)+'</small></span></button>').join('');
+async function resolveCard(nm,nn){
+  const o=$('#cout'),c=await findCards(nm,nn);
+  if(!c.length){o.innerHTML='<p class="st err">Carte non reconnue'+(nn?' (numéro lu : '+nn.n+'/'+nn.t+')':'')+'. Corrige le nom ci-dessous.</p>';$('#cman').open=true;return}
+  const b=bestByName(c,nm);
+  if(b){await showCard(b.id);return}
+  CARDS=c;o.innerHTML='<p class="st">Plusieurs cartes possibles : touche la bonne.</p>';$('#cres').innerHTML=listHtml(c);
+}
+async function identify(k){
+  stopCam();setSide('card');CARDS=[];CUR=null;
+  $('#cres').innerHTML='';$('#csv').hidden=true;$('#cimg').hidden=true;
+  const o=$('#cout');o.innerHTML='<p class="st">Préparation de l’image…</p>';
+  const c=cardCrop(k);$('#cimg').src=c.toDataURL('image/jpeg',.8);$('#cimg').hidden=false;
+  let t;
+  try{o.innerHTML='<p class="st">Lecture du texte de la carte… (la première fois, le chargement du lecteur peut prendre un moment)</p>';t=await ocrAll(c)}
+  catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>';$('#cman').open=true;return}
+  const nm=cleanName(t.name),nn=parseNum(t.nums);
+  $('#cq').value=nm;
+  o.innerHTML='<p class="st">Recherche de la carte…</p>';
+  try{await resolveCard(nm,nn)}catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>'}
+}
+const priceOf=c=>{
+  const m=(c.pricing&&c.pricing.cardmarket)||{},v=[m.trend,m.avg,m.avg30,m['trend-holo'],m['avg-holo'],m['avg30-holo']].find(x=>typeof x==='number'&&x>0);
+  return v||null;
+};
+async function showCard(id){
+  const o=$('#cout');o.innerHTML='<p class="st">Récupération du prix…</p>';$('#cres').innerHTML='';
+  let c;try{c=await td('/cards/'+encodeURIComponent(id))}catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>';return}
+  CUR=c;
+  const pm=(c.pricing&&c.pricing.cardmarket)||{},tp=(c.pricing&&c.pricing.tcgplayer)||{};
+  const row=(l,v,f)=>typeof v==='number'&&v>0?'<tr><td>'+l+'</td><td>'+f(v)+'</td></tr>':'';
+  const rows=row('Tendance',pm.trend,eur)+row('Moyenne',pm.avg,eur)+row('Plus bas',pm.low,eur)+row('Moyenne 7 jours',pm.avg7,eur)+row('Moyenne 30 jours',pm.avg30,eur)
+    +row('Tendance (holo)',pm['trend-holo'],eur)+row('Moyenne (holo)',pm['avg-holo'],eur)+row('Plus bas (holo)',pm['low-holo'],eur)
+    +Object.keys(tp).map(k=>tp[k]&&typeof tp[k]==='object'?row('TCGplayer '+esc(k),tp[k].marketPrice,usd):'').join('');
+  const pr=priceOf(c),st=c.set||{},cnt=st.cardCount&&(st.cardCount.official||st.cardCount.total);
+  o.innerHTML='<div class="g">'+(st.logo?'<img alt="" src="'+esc(st.logo)+'.png" style="height:34px;max-width:60%;object-fit:contain">':'')+
+    '<span>'+esc(st.name||'')+'</span><b style="font-size:1.3rem">'+esc(c.name||'')+'</b><small>n° '+esc(c.localId||'')+(cnt?'/'+cnt:'')+(c.rarity?' · '+esc(c.rarity):'')+'</small>'+
+    (pr?'<div class="gp">'+eur(pr)+'</div><small>Prix Cardmarket (carte non gradée)</small>':'<p class="st">Pas de prix disponible pour cette carte.</p>')+
+    (rows?'<table class="gtab">'+rows+'</table>':'')+'</div><p class="nt">Prix d’une carte non gradée, d’après Cardmarket et TCGplayer. Ce sont des moyennes de marché, pas des ventes une par une.</p>';
+  if(c.image)$('#cimg').src=c.image+'/low.png';
+  $('#csv').hidden=false;$('#csv').disabled=false;$('#csv').textContent='Ajouter à ma collection';
+}
+$('#cres').onclick=e=>{const b=e.target.closest&&e.target.closest('button[data-i]');if(b&&CARDS[+b.dataset.i])showCard(CARDS[+b.dataset.i].id)};
+$('#cs').onclick=async()=>{
+  const q=$('#cq').value.trim();if(!q)return;
+  const o=$('#cout');o.innerHTML='<p class="st">Recherche…</p>';$('#cres').innerHTML='';
+  try{
+    CARDS=(await td('/cards?name='+encodeURIComponent(tokenFor(q)||q))).slice(0,40);
+    o.innerHTML=CARDS.length?'<p class="st">Touche la bonne carte.</p>':'<p class="st err">Aucune carte trouvée.</p>';
+    $('#cres').innerHTML=listHtml(CARDS);
+  }catch(e){o.innerHTML='<p class="st err">'+esc(e.message)+'</p>'}
+};
+$('#scan').onclick=()=>setSide('scan');
+$('#cagain').onclick=()=>setSide('scan');
+/* collection */
+const CK='centrage-coll';
+const cload=()=>{try{return JSON.parse(localStorage.getItem(CK)||'[]')}catch(e){return[]}};
+const csave=a=>{try{localStorage.setItem(CK,JSON.stringify(a));return true}catch(e){return false}};
+$('#csv').onclick=()=>{
+  if(!CUR)return;
+  const st=CUR.set||{},cnt=st.cardCount&&(st.cardCount.official||st.cardCount.total);
+  const a=cload();
+  a.unshift({id:Date.now(),name:CUR.name,set:st.name||'',num:CUR.localId+(cnt?'/'+cnt:''),img:CUR.image?CUR.image+'/low.png':'',price:priceOf(CUR),date:new Date().toLocaleDateString('fr-FR')});
+  if(csave(a)){$('#csv').textContent='Ajoutée ✓';$('#csv').disabled=true}else $('#csv').textContent='Mémoire pleine';
+};
+function collView(){
+  const a=cload(),tot=a.reduce((x,e)=>x+(e.price||0),0);
+  $('#cclr').hidden=!a.length;
+  $('#cl').innerHTML=a.length?'<div class="g" style="margin-bottom:8px"><span>'+a.length+' carte'+(a.length>1?'s':'')+' · valeur estimée</span><div class="gp">'+eur(tot)+'</div></div>'+a.map(e=>'<div class="hi"><div class="ht">'+(e.img?'<img alt="" src="'+esc(e.img)+'">':'')+'</div><div class="hb"><b>'+esc(e.name)+'</b><small>'+esc(e.set)+' · n° '+esc(e.num)+'</small><span>'+(e.price?eur(e.price):'prix indisponible')+' · '+esc(e.date)+'</span><button class="b" data-d="'+e.id+'">Supprimer</button></div></div>').join(''):'<p class="st">Ta collection est vide. Scanne une carte puis ajoute-la.</p>';
+}
+$('#cl').onclick=e=>{
+  const id=e.target.dataset&&e.target.dataset.d;if(!id)return;
+  if(confirm('Supprimer cette carte ?')){csave(cload().filter(x=>String(x.id)!==id));collView()}
+};
+$('#cclr').onclick=()=>{if(confirm('Tout effacer ?')){csave([]);collView()}};
+$('#coll').onclick=()=>setSide('coll');
 setSide('home');
 </script>
 </body>
